@@ -1,0 +1,119 @@
+# Dockerfile.cuda13-cutlass43
+# Production-ready image for GPU-accelerated robot learning
+# CUDA 13.0 + CUTLASS 4.3.0 + PyTorch 2.5
+#
+# Copyright (c) 2025 GOATnote Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+# Stage 1: Base CUDA environment
+FROM nvidia/cuda:13.0.0-devel-ubuntu22.04 AS base
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV CUDA_HOME=/usr/local/cuda
+ENV PATH=${CUDA_HOME}/bin:${PATH}
+ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    git \
+    wget \
+    python3-dev \
+    python3-pip \
+    libomp-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python packages
+RUN pip3 install --no-cache-dir \
+    torch==2.5.0 \
+    numpy \
+    pytest \
+    pytest-benchmark \
+    && pip3 cache purge
+
+# Stage 2: CUTLASS installation
+FROM base AS cutlass
+
+WORKDIR /opt
+
+# Clone CUTLASS 4.3.0
+RUN git clone --branch v4.3.0 --depth 1 \
+    https://github.com/NVIDIA/cutlass.git cutlass
+
+# Verify CUTLASS version
+RUN cd cutlass && \
+    git describe --tags && \
+    ls -la include/
+
+# Stage 3: Build environment
+FROM cutlass AS builder
+
+ENV CUTLASS_HOME=/opt/cutlass
+
+WORKDIR /workspace
+
+# Copy source code
+COPY robocache/ /workspace/robocache/
+COPY Makefile /workspace/
+COPY NVIDIA_ROBOTICS_INFRA_EVIDENCE/ /workspace/NVIDIA_ROBOTICS_INFRA_EVIDENCE/
+
+# Build tests and benchmarks
+RUN make build-tests build-benchmarks CUDA_ARCH=90
+
+# Verify binaries
+RUN ls -lh build/tests/test_multimodal_fusion && \
+    ls -lh build/benchmarks/benchmark_multimodal_fusion
+
+# Stage 4: Runtime image
+FROM nvidia/cuda:13.0.0-runtime-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV CUDA_HOME=/usr/local/cuda
+ENV PATH=${CUDA_HOME}/bin:${PATH}
+ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    libomp5 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python runtime packages
+RUN pip3 install --no-cache-dir \
+    torch==2.5.0 \
+    numpy \
+    && pip3 cache purge
+
+WORKDIR /workspace
+
+# Copy built binaries from builder
+COPY --from=builder /workspace/build /workspace/build
+COPY --from=builder /workspace/robocache /workspace/robocache
+COPY --from=builder /workspace/Makefile /workspace/
+COPY --from=builder /workspace/NVIDIA_ROBOTICS_INFRA_EVIDENCE /workspace/NVIDIA_ROBOTICS_INFRA_EVIDENCE
+
+# Copy CUTLASS headers (needed for runtime)
+COPY --from=builder /opt/cutlass/include /opt/cutlass/include
+ENV CUTLASS_HOME=/opt/cutlass
+
+# Set up entrypoint
+COPY NVIDIA_ROBOTICS_INFRA_EVIDENCE/CLUSTER_INFRA/docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+# GPU health check script
+COPY NVIDIA_ROBOTICS_INFRA_EVIDENCE/CLUSTER_INFRA/preflight.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/preflight.sh
+
+# Metadata
+LABEL org.opencontainers.image.title="RoboCache - Multimodal Fusion"
+LABEL org.opencontainers.image.description="GPU-accelerated multimodal fusion for robot foundation models"
+LABEL org.opencontainers.image.version="1.0.0"
+LABEL org.opencontainers.image.vendor="GOATnote Inc."
+LABEL org.opencontainers.image.licenses="Apache-2.0"
+LABEL com.nvidia.cuda.version="13.0.0"
+LABEL com.nvidia.cutlass.version="4.3.0"
+
+# Default command: run validation suite
+CMD ["/usr/local/bin/docker-entrypoint.sh"]
