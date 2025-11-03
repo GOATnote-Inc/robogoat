@@ -1,0 +1,266 @@
+{
+  "dashboard": {
+    "title": "RoboCache GPU Preprocessing Pipeline",
+    "tags": ["robocache", "gpu", "robotics"],
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "version": 0,
+    "refresh": "10s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Throughput (Trajectories/Second)",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "rate(robocache_trajectories_processed_total[1m])",
+            "legendFormat": "GPU {{gpu_id}} - {{dtype}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "ops",
+            "label": "Trajectories/sec"
+          },
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Memory Bandwidth Utilization",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "robocache_bandwidth_gbps",
+            "legendFormat": "GPU {{gpu_id}} - {{dtype}}",
+            "refId": "A"
+          },
+          {
+            "expr": "2000",
+            "legendFormat": "H100 Peak (2000 GB/s)",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "GBs",
+            "label": "Bandwidth (GB/s)",
+            "max": 2500
+          },
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Processing Latency (P50, P95, P99)",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(robocache_resample_duration_seconds_bucket[5m])) by (le, gpu_id))",
+            "legendFormat": "P50 - GPU {{gpu_id}}",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(robocache_resample_duration_seconds_bucket[5m])) by (le, gpu_id))",
+            "legendFormat": "P95 - GPU {{gpu_id}}",
+            "refId": "B"
+          },
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(robocache_resample_duration_seconds_bucket[5m])) by (le, gpu_id))",
+            "legendFormat": "P99 - GPU {{gpu_id}}",
+            "refId": "C"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "s",
+            "label": "Latency",
+            "logBase": 10
+          },
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 4,
+        "title": "GPU Memory Usage",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "robocache_gpu_memory_allocated_bytes / 1e9",
+            "legendFormat": "Allocated - GPU {{gpu_id}}",
+            "refId": "A"
+          },
+          {
+            "expr": "robocache_gpu_memory_reserved_bytes / 1e9",
+            "legendFormat": "Reserved - GPU {{gpu_id}}",
+            "refId": "B"
+          },
+          {
+            "expr": "80",
+            "legendFormat": "H100 Capacity (80 GB)",
+            "refId": "C"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "gbytes",
+            "label": "Memory (GB)",
+            "max": 85
+          },
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Error Rate",
+        "type": "graph",
+        "gridPos": {"h": 6, "w": 12, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "rate(robocache_errors_total[5m])",
+            "legendFormat": "{{error_type}} - GPU {{gpu_id}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "ops",
+            "label": "Errors/sec"
+          },
+          {"format": "short"}
+        ],
+        "alert": {
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [0.01],
+                "type": "gt"
+              },
+              "operator": {"type": "and"},
+              "query": {"params": ["A", "5m", "now"]},
+              "reducer": {"params": [], "type": "avg"},
+              "type": "query"
+            }
+          ],
+          "name": "High Error Rate Alert"
+        }
+      },
+      {
+        "id": 6,
+        "title": "Batch Size Distribution",
+        "type": "heatmap",
+        "gridPos": {"h": 6, "w": 12, "x": 12, "y": 16},
+        "targets": [
+          {
+            "expr": "rate(robocache_batch_size_bucket[5m])",
+            "legendFormat": "{{le}}",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Bandwidth Utilization (%)",
+        "type": "gauge",
+        "gridPos": {"h": 6, "w": 6, "x": 0, "y": 22},
+        "targets": [
+          {
+            "expr": "(robocache_bandwidth_gbps / 2000) * 100",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "showThresholdLabels": true,
+          "showThresholdMarkers": true
+        },
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 20},
+                {"color": "green", "value": 50},
+                {"color": "blue", "value": 70}
+              ]
+            },
+            "unit": "percent",
+            "max": 100,
+            "min": 0
+          }
+        }
+      },
+      {
+        "id": 8,
+        "title": "Total Trajectories Processed",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 6, "x": 6, "y": 22},
+        "targets": [
+          {
+            "expr": "sum(robocache_trajectories_processed_total)",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "textMode": "value_and_name",
+          "colorMode": "value"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "decimals": 0
+          }
+        }
+      },
+      {
+        "id": 9,
+        "title": "Average Throughput per GPU",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 6, "x": 12, "y": 22},
+        "targets": [
+          {
+            "expr": "avg(rate(robocache_trajectories_processed_total[5m]))",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "textMode": "value_and_name",
+          "colorMode": "value"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ops",
+            "decimals": 0
+          }
+        }
+      },
+      {
+        "id": 10,
+        "title": "Data Processed (GB)",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 6, "x": 18, "y": 22},
+        "targets": [
+          {
+            "expr": "sum(robocache_bytes_processed_total) / 1e9",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "textMode": "value_and_name",
+          "colorMode": "value"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "decgbytes",
+            "decimals": 2
+          }
+        }
+      }
+    ]
+  }
+}

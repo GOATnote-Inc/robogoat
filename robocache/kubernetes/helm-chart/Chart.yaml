@@ -1,0 +1,17 @@
+apiVersion: v2
+name: robocache
+description: GPU-accelerated data engine for embodied AI foundation models
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - robotics
+  - gpu
+  - cuda
+  - machine-learning
+  - data-preprocessing
+maintainers:
+  - name: RoboCache Team
+    email: [email protected]
+sources:
+  - https://github.com/yourusername/robocache

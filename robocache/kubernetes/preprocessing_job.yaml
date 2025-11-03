@@ -1,0 +1,199 @@
+---
+# Kubernetes Job for Large-Scale Trajectory Preprocessing
+# Processes robot datasets (e.g., RT-X, Open-X Embodiment) using GPU-accelerated RoboCache
+#
+# Usage:
+#   kubectl apply -f preprocessing_job.yaml
+#   kubectl logs -f job/robocache-preprocess-rtx
+#
+# Requirements:
+#   - NVIDIA GPU Operator installed (for GPU device plugin)
+#   - Persistent storage (NFS, S3, or distributed filesystem)
+#   - Prometheus Pushgateway (optional, for metrics)
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: robocache-preprocess-rtx
+  namespace: robot-learning
+  labels:
+    app: robocache
+    component: preprocessing
+    dataset: rtx
+spec:
+  # Parallelism: Number of concurrent pods (one pod per GPU typically)
+  parallelism: 8
+
+  # Completions: Total number of jobs to run
+  # For 1M trajectories at 1000 per job = 1000 completions
+  completions: 1000
+
+  # Allow up to 5 retries per job
+  backoffLimit: 5
+
+  # Clean up completed jobs after 1 day
+  ttlSecondsAfterFinished: 86400
+
+  template:
+    metadata:
+      labels:
+        app: robocache
+        component: preprocessing
+    spec:
+      restartPolicy: OnFailure
+
+      # Node selector: Schedule on GPU nodes
+      nodeSelector:
+        accelerator: nvidia-gpu
+        gpu-type: h100  # Prefer H100 GPUs
+
+      # Tolerations: Allow scheduling on tainted GPU nodes
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+
+      containers:
+      - name: robocache-worker
+        image: robocache:latest
+        imagePullPolicy: Always
+
+        command:
+        - python3
+        - /workspace/robocache/scripts/batch_preprocess.py
+
+        args:
+        - --input-dir
+        - /data/input/rtx
+        - --output-dir
+        - /data/output/rtx-50hz
+        - --target-frequency
+        - "50.0"
+        - --batch-size
+        - "256"
+        - --dtype
+        - bfloat16
+        - --prometheus-pushgateway
+        - http://prometheus-pushgateway:9091
+
+        env:
+        # Job completion index (used to shard dataset)
+        - name: JOB_COMPLETION_INDEX
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.annotations['batch.kubernetes.io/job-completion-index']
+
+        # S3 credentials (if using S3 storage)
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: s3-credentials
+              key: access-key-id
+              optional: true
+
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: s3-credentials
+              key: secret-access-key
+              optional: true
+
+        - name: S3_ENDPOINT_URL
+          value: "https://s3.us-west-2.amazonaws.com"
+
+        # Enable CUDA optimizations
+        - name: CUDA_VISIBLE_DEVICES
+          value: "0"  # Single GPU per pod
+
+        - name: PYTORCH_CUDA_ALLOC_CONF
+          value: "max_split_size_mb:512"
+
+        resources:
+          requests:
+            cpu: "8"
+            memory: "64Gi"
+            nvidia.com/gpu: 1
+          limits:
+            cpu: "16"
+            memory: "128Gi"
+            nvidia.com/gpu: 1
+
+        volumeMounts:
+        # Shared storage for dataset (NFS, EFS, or distributed filesystem)
+        - name: dataset-storage
+          mountPath: /data
+          readOnly: false
+
+        # Shared memory for CUDA operations
+        - name: dshm
+          mountPath: /dev/shm
+
+      volumes:
+      - name: dataset-storage
+        persistentVolumeClaim:
+          claimName: robot-dataset-pvc
+
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: "32Gi"
+
+---
+# PersistentVolumeClaim for dataset storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: robot-dataset-pvc
+  namespace: robot-learning
+spec:
+  accessModes:
+  - ReadWriteMany  # Multiple pods can read/write simultaneously
+  resources:
+    requests:
+      storage: 10Ti  # Adjust based on dataset size
+  storageClassName: nfs-storage  # Use your cluster's storage class
+
+---
+# Service for Prometheus Pushgateway (optional)
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-pushgateway
+  namespace: robot-learning
+spec:
+  selector:
+    app: prometheus-pushgateway
+  ports:
+  - port: 9091
+    targetPort: 9091
+    protocol: TCP
+
+---
+# Deployment for Prometheus Pushgateway
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus-pushgateway
+  namespace: robot-learning
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus-pushgateway
+  template:
+    metadata:
+      labels:
+        app: prometheus-pushgateway
+    spec:
+      containers:
+      - name: pushgateway
+        image: prom/pushgateway:latest
+        ports:
+        - containerPort: 9091
+        resources:
+          requests:
+            cpu: "1"
+            memory: "1Gi"
+          limits:
+            cpu: "2"
+            memory: "2Gi"

@@ -1,0 +1,93 @@
+# Default values for RoboCache Helm chart
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Preprocessing job configuration
+job:
+  # Number of parallel worker pods
+  parallelism: 8
+
+  # Total number of job completions
+  completions: 1000
+
+  # Retry policy
+  backoffLimit: 5
+
+  # TTL for completed jobs (seconds)
+  ttlSecondsAfterFinished: 86400
+
+# Container image
+image:
+  repository: robocache
+  pullPolicy: Always
+  tag: "latest"
+
+# Preprocessing parameters
+preprocessing:
+  targetFrequency: 50.0
+  batchSize: 256
+  dtype: "bfloat16"  # Options: bfloat16, float16, float32
+  inputDir: "/data/input/rtx"
+  outputDir: "/data/output/rtx-50hz"
+
+# GPU configuration
+gpu:
+  # GPU type for node selection
+  type: "h100"  # Options: h100, a100, rtx4090
+
+  # Number of GPUs per pod
+  count: 1
+
+# Resource requests and limits
+resources:
+  requests:
+    cpu: "8"
+    memory: "64Gi"
+  limits:
+    cpu: "16"
+    memory: "128Gi"
+
+# Storage configuration
+storage:
+  # PVC name for dataset storage
+  pvcName: "robot-dataset-pvc"
+
+  # Storage class for PVC
+  storageClass: "nfs-storage"
+
+  # Storage size
+  size: "10Ti"
+
+  # Access mode
+  accessMode: "ReadWriteMany"
+
+  # Shared memory size for CUDA
+  shmSize: "32Gi"
+
+# Observability
+observability:
+  # Enable Prometheus metrics
+  enabled: true
+
+  # Prometheus Pushgateway URL
+  pushgateway: "http://prometheus-pushgateway:9091"
+
+# S3 configuration (optional)
+s3:
+  enabled: false
+  endpoint: "https://s3.us-west-2.amazonaws.com"
+  # Credentials should be provided via Kubernetes secrets
+  credentialsSecret: "s3-credentials"
+
+# Node selection
+nodeSelector:
+  accelerator: "nvidia-gpu"
+
+# Tolerations for GPU nodes
+tolerations:
+- key: "nvidia.com/gpu"
+  operator: "Exists"
+  effect: "NoSchedule"
+
+# Namespace
+namespace: "robot-learning"
