@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 GitHub Discussions
+    url: https://github.com/yourusername/robocache/discussions
+    about: Ask questions, share ideas, and discuss RoboCache with the community
+  - name: 📚 Documentation
+    url: https://github.com/yourusername/robocache/blob/main/README.md
+    about: Read the comprehensive documentation and build instructions
+  - name: 📧 Email Support
+    url: mailto:B@thegoatnote.com
+    about: Contact the maintainer directly for sensitive issues or collaboration

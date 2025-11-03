@@ -344,9 +344,10 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 📞 Contact
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/robocache/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/robocache/discussions)
-- **Email**: [email protected]
+- **Issues**: [GitHub Issues](https://github.com/GOATnote-Inc/robogoat/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/GOATnote-Inc/robogoat/discussions)
+- **Email**: B@thegoatnote.com
+- **LinkedIn**: [Brandon Dent](https://www.linkedin.com/in/brandon-dent-84aba2130)
 
 ## 🗺️ Roadmap
 
