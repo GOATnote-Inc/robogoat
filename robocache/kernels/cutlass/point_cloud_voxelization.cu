@@ -271,60 +271,91 @@ __global__ void voxelize_tsdf_kernel(
     float truncation_distance
 ) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    int total_voxels = batch_size * depth * height * width;
+    int total_points = batch_size * num_points;
     
-    // Each thread processes one voxel
-    for (int voxel_idx = tid; voxel_idx < total_voxels; voxel_idx += gridDim.x * blockDim.x) {
-        int batch_idx = voxel_idx / (depth * height * width);
-        int local_voxel_idx = voxel_idx % (depth * height * width);
+    float inv_voxel_size = 1.0f / voxel_size;
+    float inv_trunc = 1.0f / truncation_distance;
+    int trunc_voxels = __float2int_ru(truncation_distance * inv_voxel_size) + 1;
+    
+    // Each thread processes one point and updates nearby voxels
+    for (int point_idx = tid; point_idx < total_points; point_idx += gridDim.x * blockDim.x) {
+        int batch_idx = point_idx / num_points;
+        int local_point_idx = point_idx % num_points;
         
-        // Compute voxel center in world coordinates
-        int vz = local_voxel_idx / (height * width);
-        int vy = (local_voxel_idx % (height * width)) / width;
-        int vx = local_voxel_idx % width;
+        // Load point and normal
+        int point_offset = batch_idx * num_points * 3 + local_point_idx * 3;
+        float px = points[point_offset + 0];
+        float py = points[point_offset + 1];
+        float pz = points[point_offset + 2];
         
-        float voxel_cx = origin[0] + (vx + 0.5f) * voxel_size;
-        float voxel_cy = origin[1] + (vy + 0.5f) * voxel_size;
-        float voxel_cz = origin[2] + (vz + 0.5f) * voxel_size;
+        float nx = 0.0f, ny = 0.0f, nz = 0.0f;
+        if (normals != nullptr) {
+            int normal_offset = batch_idx * num_points * 3 + local_point_idx * 3;
+            nx = normals[normal_offset + 0];
+            ny = normals[normal_offset + 1];
+            nz = normals[normal_offset + 2];
+        }
         
-        // Find closest point
-        float min_dist = 1e10f;
-        float closest_nx = 0.0f, closest_ny = 0.0f, closest_nz = 0.0f;
+        // Convert point to voxel coordinates
+        int center_vx = __float2int_rd((px - origin[0]) * inv_voxel_size);
+        int center_vy = __float2int_rd((py - origin[1]) * inv_voxel_size);
+        int center_vz = __float2int_rd((pz - origin[2]) * inv_voxel_size);
         
-        for (int p = 0; p < num_points; p++) {
-            int point_offset = batch_idx * num_points * 3 + p * 3;
-            float px = points[point_offset + 0];
-            float py = points[point_offset + 1];
-            float pz = points[point_offset + 2];
+        // Update all voxels within truncation distance
+        for (int dz = -trunc_voxels; dz <= trunc_voxels; dz++) {
+            int vz = center_vz + dz;
+            if (vz < 0 || vz >= depth) continue;
             
-            float dx = voxel_cx - px;
-            float dy = voxel_cy - py;
-            float dz = voxel_cz - pz;
-            float dist = sqrtf(dx*dx + dy*dy + dz*dz);
-            
-            if (dist < min_dist) {
-                min_dist = dist;
-                if (normals != nullptr) {
-                    int normal_offset = batch_idx * num_points * 3 + p * 3;
-                    closest_nx = normals[normal_offset + 0];
-                    closest_ny = normals[normal_offset + 1];
-                    closest_nz = normals[normal_offset + 2];
+            for (int dy = -trunc_voxels; dy <= trunc_voxels; dy++) {
+                int vy = center_vy + dy;
+                if (vy < 0 || vy >= height) continue;
+                
+                for (int dx = -trunc_voxels; dx <= trunc_voxels; dx++) {
+                    int vx = center_vx + dx;
+                    if (vx < 0 || vx >= width) continue;
+                    
+                    // Compute voxel center
+                    float voxel_cx = origin[0] + (vx + 0.5f) * voxel_size;
+                    float voxel_cy = origin[1] + (vy + 0.5f) * voxel_size;
+                    float voxel_cz = origin[2] + (vz + 0.5f) * voxel_size;
+                    
+                    // Distance to point
+                    float dx_world = voxel_cx - px;
+                    float dy_world = voxel_cy - py;
+                    float dz_world = voxel_cz - pz;
+                    float dist = sqrtf(dx_world*dx_world + dy_world*dy_world + dz_world*dz_world);
+                    
+                    if (dist < truncation_distance) {
+                        // Compute signed distance using normal
+                        float signed_dist = dist;
+                        if (normals != nullptr) {
+                            float dot = nx * dx_world + ny * dy_world + nz * dz_world;
+                            if (dot > 0) signed_dist = -dist; // Inside surface
+                        }
+                        
+                        // Normalize and clamp
+                        float tsdf_val = fmaxf(-1.0f, fminf(1.0f, signed_dist * inv_trunc));
+                        
+                        // Update voxel atomically (use min for now, proper fusion needs averaging)
+                        int voxel_idx = batch_idx * (depth * height * width) + 
+                                       vz * (height * width) + vy * width + vx;
+                        
+                        // Atomic min for TSDF (closer points win)
+                        unsigned int* tsdf_addr = (unsigned int*)(&tsdf_grid[voxel_idx]);
+                        unsigned int old = *tsdf_addr;
+                        unsigned int assumed;
+                        do {
+                            assumed = old;
+                            float old_val = __uint_as_float(assumed);
+                            float new_val = (old_val == 0.0f) ? tsdf_val : fminf(fabsf(old_val), fabsf(tsdf_val)) * ((old_val < 0) ? -1.0f : 1.0f);
+                            old = atomicCAS(tsdf_addr, assumed, __float_as_uint(new_val));
+                        } while (assumed != old);
+                        
+                        // Increment weight
+                        atomicAdd(&weight_grid[voxel_idx], 1.0f);
+                    }
                 }
             }
-        }
-        
-        // Compute signed distance using normal
-        float signed_dist = min_dist;
-        if (normals != nullptr && min_dist < truncation_distance) {
-            // Use normal to determine sign (inside/outside surface)
-            float dot = closest_nx * (voxel_cx) + closest_ny * (voxel_cy) + closest_nz * (voxel_cz);
-            if (dot < 0) signed_dist = -min_dist;
-        }
-        
-        // Truncate distance
-        if (fabsf(signed_dist) < truncation_distance) {
-            tsdf_grid[voxel_idx] = fmaxf(-1.0f, fminf(1.0f, signed_dist / truncation_distance));
-            weight_grid[voxel_idx] = 1.0f;
         }
     }
 }
