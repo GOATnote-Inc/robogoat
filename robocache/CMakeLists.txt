@@ -188,6 +188,22 @@ set_target_properties(benchmark_multimodal_fusion PROPERTIES
     CUDA_RESOLVE_DEVICE_SYMBOLS ON
 )
 
+# Point cloud voxelization benchmark
+add_executable(benchmark_voxelization
+    benchmarks/benchmark_voxelization.cu
+    kernels/cutlass/point_cloud_voxelization.cu
+)
+
+target_include_directories(benchmark_voxelization PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/kernels/cutlass
+    ${CUTLASS_INCLUDE_DIR}
+)
+
+set_target_properties(benchmark_voxelization PROPERTIES
+    CUDA_SEPARABLE_COMPILATION ON
+    CUDA_RESOLVE_DEVICE_SYMBOLS ON
+)
+
 # ==============================================================================
 # PyTorch extension (Python module)
 # ==============================================================================
@@ -200,6 +216,8 @@ if(BUILD_TORCH_EXTENSION)
         kernels/cutlass/trajectory_resample_torch.cu
         kernels/cutlass/multimodal_fusion.cu
         kernels/cutlass/multimodal_fusion_torch.cu
+        kernels/cutlass/point_cloud_voxelization.cu
+        kernels/cutlass/point_cloud_voxelization_torch.cu
     )
 
     target_include_directories(robocache_cuda PRIVATE
@@ -250,6 +268,7 @@ endif()
 install(FILES 
     kernels/cutlass/trajectory_resample.h
     kernels/cutlass/multimodal_fusion.h
+    kernels/cutlass/point_cloud_voxelization.h
     DESTINATION include/robocache
 )
 
