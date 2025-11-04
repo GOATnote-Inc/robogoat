@@ -204,6 +204,22 @@ set_target_properties(benchmark_voxelization PROPERTIES
     CUDA_RESOLVE_DEVICE_SYMBOLS ON
 )
 
+# Comprehensive voxelization benchmark (all modes)
+add_executable(benchmark_voxelization_full
+    benchmarks/benchmark_voxelization_full.cu
+    kernels/cutlass/point_cloud_voxelization.cu
+)
+
+target_include_directories(benchmark_voxelization_full PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/kernels/cutlass
+    ${CUTLASS_INCLUDE_DIR}
+)
+
+set_target_properties(benchmark_voxelization_full PROPERTIES
+    CUDA_SEPARABLE_COMPILATION ON
+    CUDA_RESOLVE_DEVICE_SYMBOLS ON
+)
+
 # ==============================================================================
 # PyTorch extension (Python module)
 # ==============================================================================
