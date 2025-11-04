@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <vector>
 #include <chrono>
+#include <cmath>
 #include <cuda_runtime.h>
 #include "point_cloud_voxelization.h"
 
@@ -46,10 +47,10 @@ void voxelize_occupancy_cpu(
             float py = points[point_offset + 1];
             float pz = points[point_offset + 2];
             
-            // Convert to voxel index
-            int vx = static_cast<int>((px - origin[0]) / voxel_size);
-            int vy = static_cast<int>((py - origin[1]) / voxel_size);
-            int vz = static_cast<int>((pz - origin[2]) / voxel_size);
+            // Convert to voxel index (floor, matching GPU __float2int_rd)
+            int vx = std::floor((px - origin[0]) / voxel_size);
+            int vy = std::floor((py - origin[1]) / voxel_size);
+            int vz = std::floor((pz - origin[2]) / voxel_size);
             
             // Check bounds
             if (vx >= 0 && vx < width &&
