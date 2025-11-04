@@ -47,7 +47,12 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
 # H100 = compute capability 9.0 (sm_90)
 # Also support A100 (8.0) and RTX 4090 (8.9) for testing
-set(CMAKE_CUDA_ARCHITECTURES "90;89;80" CACHE STRING "CUDA architectures")
+# Set default to H100 if not specified
+if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+    set(CMAKE_CUDA_ARCHITECTURES "90" CACHE STRING "CUDA architectures" FORCE)
+else()
+    set(CMAKE_CUDA_ARCHITECTURES "${CMAKE_CUDA_ARCHITECTURES}" CACHE STRING "CUDA architectures")
+endif()
 
 message(STATUS "CUDA architectures: ${CMAKE_CUDA_ARCHITECTURES}")
 
@@ -77,25 +82,17 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif()
 
 # ==============================================================================
+# CMake modules
+# ==============================================================================
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
+# ==============================================================================
 # Find dependencies
 # ==============================================================================
 
-# CUTLASS
-set(CUTLASS_DIR "/usr/local/cutlass" CACHE PATH "Path to CUTLASS installation")
-find_path(CUTLASS_INCLUDE_DIR
-    NAMES cutlass/cutlass.h
-    PATHS ${CUTLASS_DIR}/include
-          /usr/local/include
-          /usr/include
-)
-
-if(NOT CUTLASS_INCLUDE_DIR)
-    message(FATAL_ERROR
-        "CUTLASS not found. Please install CUTLASS 4.3.0 or set CUTLASS_DIR.\n"
-        "Download from: https://github.com/NVIDIA/cutlass")
-endif()
-
-message(STATUS "CUTLASS include dir: ${CUTLASS_INCLUDE_DIR}")
+# CUTLASS 4.3.0 (fetched via FetchContent or user-supplied)
+include(ThirdPartyCUTLASS)
 
 # PyTorch (for Python bindings)
 find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
@@ -148,10 +145,45 @@ add_executable(benchmark_trajectory_resample
 )
 
 target_include_directories(benchmark_trajectory_resample PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/kernels/cutlass
     ${CUTLASS_INCLUDE_DIR}
 )
 
 set_target_properties(benchmark_trajectory_resample PROPERTIES
+    CUDA_SEPARABLE_COMPILATION ON
+    CUDA_RESOLVE_DEVICE_SYMBOLS ON
+)
+
+# Optimization comparison benchmark
+add_executable(benchmark_optimization
+    benchmarks/benchmark_optimization.cu
+    kernels/cutlass/trajectory_resample.cu
+    kernels/cutlass/trajectory_resample_optimized.cu
+)
+
+target_include_directories(benchmark_optimization PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/kernels/cutlass
+    ${CUTLASS_INCLUDE_DIR}
+)
+
+set_target_properties(benchmark_optimization PROPERTIES
+    CUDA_SEPARABLE_COMPILATION ON
+    CUDA_RESOLVE_DEVICE_SYMBOLS ON
+)
+
+# Multimodal fusion benchmark
+add_executable(benchmark_multimodal_fusion
+    benchmarks/benchmark_multimodal_fusion.cu
+    kernels/cutlass/trajectory_resample.cu
+    kernels/cutlass/multimodal_fusion.cu
+)
+
+target_include_directories(benchmark_multimodal_fusion PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/kernels/cutlass
+    ${CUTLASS_INCLUDE_DIR}
+)
+
+set_target_properties(benchmark_multimodal_fusion PROPERTIES
     CUDA_SEPARABLE_COMPILATION ON
     CUDA_RESOLVE_DEVICE_SYMBOLS ON
 )
@@ -163,10 +195,15 @@ set_target_properties(benchmark_trajectory_resample PROPERTIES
 if(BUILD_TORCH_EXTENSION)
     add_library(robocache_cuda MODULE
         kernels/cutlass/trajectory_resample.cu
+        kernels/cutlass/trajectory_resample_optimized.cu
+        kernels/cutlass/trajectory_resample_production.cu
         kernels/cutlass/trajectory_resample_torch.cu
+        kernels/cutlass/multimodal_fusion.cu
+        kernels/cutlass/multimodal_fusion_torch.cu
     )
 
     target_include_directories(robocache_cuda PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/kernels/cutlass
         ${CUTLASS_INCLUDE_DIR}
         ${TORCH_INCLUDE_DIRS}
         ${Python3_INCLUDE_DIRS}
@@ -210,7 +247,9 @@ if(BUILD_TORCH_EXTENSION)
 endif()
 
 # Install headers
-install(FILES kernels/cutlass/trajectory_resample.h
+install(FILES 
+    kernels/cutlass/trajectory_resample.h
+    kernels/cutlass/multimodal_fusion.h
     DESTINATION include/robocache
 )
 
