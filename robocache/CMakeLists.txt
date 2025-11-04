@@ -220,6 +220,22 @@ set_target_properties(benchmark_voxelization_full PROPERTIES
     CUDA_RESOLVE_DEVICE_SYMBOLS ON
 )
 
+# Action space conversion benchmark (Phase 4)
+add_executable(benchmark_action_space
+    benchmarks/benchmark_action_space.cu
+    kernels/cutlass/action_space_conversion.cu
+)
+
+target_include_directories(benchmark_action_space PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/kernels/cutlass
+    ${CUTLASS_INCLUDE_DIR}
+)
+
+set_target_properties(benchmark_action_space PROPERTIES
+    CUDA_SEPARABLE_COMPILATION ON
+    CUDA_RESOLVE_DEVICE_SYMBOLS ON
+)
+
 # ==============================================================================
 # PyTorch extension (Python module)
 # ==============================================================================
