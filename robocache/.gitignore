@@ -57,7 +57,7 @@ h100_*.txt
 *.orig
 *~
 
-# Shell scripts (temporary/local)
+# Shell scripts (temporary/local - keep important ones like run_all.sh)
 execute_build.sh
 gpu_build_and_test.sh
 remote_build.sh
@@ -65,6 +65,7 @@ build_and_test*.sh
 RUN_*.sh
 DEPLOY_*.sh
 VALIDATE_*.sh
+!benchmarks/run_all.sh
 
 # Test outputs
 FINAL_*.txt
