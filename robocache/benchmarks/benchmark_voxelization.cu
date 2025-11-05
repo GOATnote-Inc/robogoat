@@ -39,7 +39,7 @@ void voxelize_occupancy_cpu(
     size_t grid_size = batch_size * depth * height * width;
     std::fill(voxel_grid, voxel_grid + grid_size, 0.0f);
     
-    // Voxelize points
+    // Pass 1: Accumulate point counts per voxel (matches GPU atomicAdd behavior)
     for (int b = 0; b < batch_size; b++) {
         for (int p = 0; p < num_points; p++) {
             int point_offset = b * num_points * 3 + p * 3;
@@ -56,13 +56,19 @@ void voxelize_occupancy_cpu(
             if (vx >= 0 && vx < width &&
                 vy >= 0 && vy < height &&
                 vz >= 0 && vz < depth) {
-                int voxel_idx = b * (depth * height * width) +
-                               vz * (height * width) +
-                               vy * width +
-                               vx;
-                voxel_grid[voxel_idx] = 1.0f;
+                size_t voxel_idx = static_cast<size_t>(b) * (depth * height * width) +
+                                   static_cast<size_t>(vz) * (height * width) +
+                                   static_cast<size_t>(vy) * width +
+                                   static_cast<size_t>(vx);
+                // Accumulate counts (matches GPU atomicAdd)
+                voxel_grid[voxel_idx] += 1.0f;
             }
         }
+    }
+    
+    // Pass 2: Convert counts to binary occupancy (matches GPU second pass)
+    for (size_t i = 0; i < grid_size; i++) {
+        voxel_grid[i] = (voxel_grid[i] > 0.0f) ? 1.0f : 0.0f;
     }
 }
 
@@ -87,17 +93,18 @@ void voxelize_density_cpu(
             float py = points[point_offset + 1];
             float pz = points[point_offset + 2];
             
-            int vx = static_cast<int>((px - origin[0]) / voxel_size);
-            int vy = static_cast<int>((py - origin[1]) / voxel_size);
-            int vz = static_cast<int>((pz - origin[2]) / voxel_size);
+            // PRODUCTION FIX: Use std::floor (matches GPU __float2int_rd)
+            int vx = std::floor((px - origin[0]) / voxel_size);
+            int vy = std::floor((py - origin[1]) / voxel_size);
+            int vz = std::floor((pz - origin[2]) / voxel_size);
             
             if (vx >= 0 && vx < width &&
                 vy >= 0 && vy < height &&
                 vz >= 0 && vz < depth) {
-                int voxel_idx = b * (depth * height * width) +
-                               vz * (height * width) +
-                               vy * width +
-                               vx;
+                size_t voxel_idx = static_cast<size_t>(b) * (depth * height * width) +
+                                   static_cast<size_t>(vz) * (height * width) +
+                                   static_cast<size_t>(vy) * width +
+                                   static_cast<size_t>(vx);
                 voxel_grid[voxel_idx] += 1.0f;
             }
         }

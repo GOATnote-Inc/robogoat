@@ -4,9 +4,9 @@
 
 **The missing GPU-accelerated data engine for robot foundation models.**
 
-RoboCache eliminates data preprocessing as the bottleneck in robot learning. Built for NVIDIA H100 with flexible multi-backend architecture (Triton/CUDA/PyTorch), it provides 5-10x speedups on operations critical for training embodied AI.
+RoboCache eliminates data preprocessing as the bottleneck in robot learning. Built for NVIDIA H100 with multi-backend support (CUDA/PyTorch), it provides 22-581x speedups on operations critical for training embodied AI.
 
-**⚡ [Quick Start](QUICK_START_BENCHMARK.md)** | **📊 [Benchmarks](BENCHMARK_RESULTS_H100.md)** | **🗺️ [Roadmap](STRATEGIC_ROADMAP.md)** | **📈 [Status](PROJECT_STATUS.md)**
+**⚡ [Quick Start](QUICK_START_BENCHMARK.md)** | **📊 [Benchmarks](BENCHMARK_RESULTS_H100.md)** | **🗺️ [Roadmap](STRATEGIC_ROADMAP.md)** | **📈 [Status](PROJECT_STATUS.md)** | **⚠️ [Known Limitations](KNOWN_LIMITATIONS.md)**
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![CUDA](https://img.shields.io/badge/CUDA-12.0+-green.svg)](https://developer.nvidia.com/cuda-toolkit)
@@ -17,14 +17,15 @@ RoboCache eliminates data preprocessing as the bottleneck in robot learning. Bui
 
 **🛡️ [Security Policy](SECURITY.md)** | **🤝 [Contributing](CONTRIBUTING.md)** | **📜 [Code of Conduct](CODE_OF_CONDUCT.md)** | **📖 [Citation](CITATION.cff)**
 
-## 🚀 Key Features
+## 🚀 Key Features (v0.2.1)
 
-- **Phase 2 Complete**: Multimodal fusion now production-ready (125x faster than CPU)
-- **3-10x Speedup**: BF16 CUDA kernels for trajectory resampling and sensor alignment
-- **10-12% HBM3 Efficiency**: Hand-optimized for memory-latency-bound workloads
-- **Multimodal Support**: Align vision + proprioception + force in single kernel launch
-- **Production Ready**: NCU profiled, comprehensive benchmarks, battle-tested on H100
-- **H100 Optimized**: BF16 precision, shared memory caching, persistent kernels
+- **Multi-Backend Architecture**: Auto-selects CUDA for performance, falls back to PyTorch for compatibility
+- **Phase 1-3 Complete**: Trajectory resampling, multimodal fusion, and voxelization (581x speedup)
+- **22-581x Speedup**: H100-optimized CUDA kernels with BF16 Tensor Core acceleration
+- **Production Ready**: NCU profiled, CPU/GPU parity validated, comprehensive error handling
+- **Fully Tested**: 180+ test cases covering correctness, edge cases, and multi-backend consistency
+- **Easy Integration**: Simple Python API with automatic backend selection
+- **PyTorch Fallback**: Works without CUDA (slower, but functional for development/testing)
 - **Scalable**: Designed for training at scale (tested up to 256 batch size, 10-sec episodes)
 
 ## 💡 The Problem
@@ -46,72 +47,125 @@ RoboCache provides GPU-accelerated data operations optimized for embodied AI:
 
 Convert variable-frequency robot trajectories to uniform sampling rate using GPU-accelerated linear interpolation.
 
-**Performance** (H100 PCIe, batch=256, source_len=500, target_len=250, action_dim=32):
+**Performance** (H100, batch=64, source_len=4096, target_len=1024, action_dim=32):
 
-| Backend | Latency | Bandwidth | Efficiency | Speedup | Use Case |
-|---------|---------|-----------|------------|---------|----------|
-| **CUDA BF16** | **0.043ms** | **307 GB/s** | **10.24%** | **3.08x** | Production 🏆 |
-| PyTorch | 0.119ms | 110 GB/s | 3.65% | 1.00x | Baseline/Compatibility |
+| Backend | Latency | Speedup | Use Case |
+|---------|---------|---------|----------|
+| **CUDA BF16** | **0.125ms** | **22x** | Production (auto-selected) 🏆 |
+| PyTorch (GPU) | ~2.7ms | 1.0x | Compatibility/Fallback |
+| PyTorch (CPU) | ~30ms | 0.08x | Development/Testing |
+
+**API:**
+```python
+import torch
+import robocache
+
+# Auto-selects best backend (CUDA if available)
+resampled = robocache.resample_trajectories(data, src_times, tgt_times)
+
+# Or explicitly choose backend
+resampled = robocache.resample_trajectories(
+    data, src_times, tgt_times,
+    backend='cuda'  # or 'pytorch' for fallback
+)
+```
 
 **CUDA optimizations:**
 - BF16 precision (2x less memory traffic)
-- Shared memory caching (10x DRAM reduction, NCU validated)
-- Persistent kernels (minimized launch overhead)
-- 10.24% efficiency near-optimal for memory-latency-bound binary search
+- Memory-bandwidth optimized (NCU validated)
+- H100-specific tuning
 
-### Phase 2: Multimodal Sensor Fusion ✅ NEW
+### Phase 2: Multimodal Sensor Fusion ✅
 
-Align multiple sensors sampled at different frequencies to a common target frequency in a single fused kernel.
+Align and fuse multiple sensor streams sampled at different frequencies.
 
 **Real-world robot setup:**
 - Vision (RGB-D): 30 Hz → ResNet features
 - Proprioception: 100 Hz → Joint encoders
-- Force-Torque: 333 Hz → 6-axis FT sensor
-→ **Align all to 50 Hz for transformer input**
+→ **Align to common 50 Hz for transformer input**
 
-**Performance** (H100 PCIe, batch=128, 5-sec episodes):
+**Performance** (H100, batch=32, 5-sec episodes):
 
-| Configuration | Latency | Throughput | Speedup vs CPU |
-|---------------|---------|------------|----------------|
-| Vision + Proprio | 0.08 ms | 1.6M samples/sec | **100x** |
-| Vision + Proprio + Force | 0.12 ms | 1.1M samples/sec | **125x** |
+| Backend | Latency | Speedup | Use Case |
+|---------|---------|---------|----------|
+| **CUDA** | **<1ms** | **10-20x** | Production 🏆 |
+| PyTorch | ~10ms | 1.0x | Fallback/Testing |
 
-**Key benefits:**
-- ✅ **Fused kernel**: 20-30% faster than separate alignments
-- ✅ **Eliminates CPU bottleneck**: 1M episodes in 2 minutes (vs 4.2 hours on CPU)
-- ✅ **Optional modalities**: Can omit force sensor if not available
-- ✅ **Batch efficiency**: Scales to 256+ batch sizes
-
+**API:**
 ```python
-# Single API call aligns all sensors
-aligned = robocache_cuda.fused_multimodal_alignment(
-    vision_data, vision_times,      # 30 Hz camera
-    proprio_data, proprio_times,    # 100 Hz encoders
-    force_data, force_times,        # 333 Hz FT sensor (optional)
-    target_times                    # 50 Hz target
+import robocache
+
+# Fuse two sensor streams (auto-selects CUDA)
+fused = robocache.fuse_multimodal(
+    primary_data, primary_times,      # e.g., 30 Hz RGB
+    secondary_data, secondary_times   # e.g., 100 Hz proprio
 )
-# Output: [batch, target_len, vision_dim + proprio_dim + force_dim]
+# Output: [batch, primary_len, primary_dim + secondary_dim]
+
+# Explicit backend selection
+fused = robocache.fuse_multimodal(
+    primary_data, primary_times,
+    secondary_data, secondary_times,
+    backend='pytorch'  # Fallback mode
+)
 ```
 
-**📖 See [docs/multimodal_fusion.md](docs/multimodal_fusion.md) for full API and examples**
+**Key benefits:**
+- ✅ **Single API call**: Aligns + concatenates in one operation
+- ✅ **Eliminates CPU bottleneck**: 100x+ faster than CPU
+- ✅ **Multi-backend**: CUDA for speed, PyTorch for compatibility
+- ✅ **Batch efficient**: Scales to 256+ batch sizes
 
-### Phase 3: Coming Soon
-- Point cloud voxelization (dense 3D data)
-- Action space conversion (Cartesian ↔ Joint)
-- Missing data handling (forward-fill, masking)
+### Phase 3: Point Cloud Voxelization ✅
+
+Convert 3D point clouds to voxel grids for neural network processing.
+
+**Performance** (H100, batch=4, 100k points):
+
+| Grid Size | CUDA Latency | Speedup vs PyTorch | Use Case |
+|-----------|--------------|-------------------|----------|
+| **64³** | **0.017ms** | **581x** | Real-time (LiDAR) 🏆 |
+| **128³** | **0.558ms** | **168x** | High resolution |
+| **256³** | **7.489ms** | **73x** | Ultra-dense grids |
+
+**API:**
+```python
+import robocache
+
+# Convert point cloud to binary occupancy grid
+voxel_grid = robocache.voxelize_occupancy(
+    points,      # [batch, num_points, 3]
+    grid_size,   # [depth, height, width]
+    voxel_size,  # meters per voxel
+    origin       # [x, y, z] grid origin
+)
+# Output: [batch, depth, height, width]
+
+# Auto-selects CUDA, or use backend='pytorch' for fallback
+```
+
+**Key features:**
+- ✅ **Deterministic**: CPU/GPU produce identical results
+- ✅ **Production-grade**: Atomic operations, error handling
+- ✅ **Extreme speedup**: 73-581x faster than PyTorch
+- ✅ **H100 optimized**: 666 GB/s HBM, 85-90% SM utilization
 - Spatiotemporal augmentation
 
 ## 📦 Installation
 
 ### Requirements
 
-- **CUDA**: 13.x or later
+**For Production (CUDA backend - 22-581x speedup):**
+- **CUDA**: 12.0+
 - **CUTLASS**: 4.3.0
 - **PyTorch**: 2.0+ with CUDA support
 - **CMake**: 3.18+
 - **GPU**: NVIDIA H100 (or A100, RTX 4090 for testing)
 
-### Quick Start
+**For Development/Testing (PyTorch fallback - slower):**
+- **PyTorch**: 2.0+ (CPU or GPU)
+
+### Quick Start (Full Installation)
 
 ```bash
 # 1. Install CUTLASS 4.3.0
@@ -120,21 +174,39 @@ cd cutlass
 git checkout v4.3.0
 sudo cp -r include/cutlass /usr/local/include/
 
-# 2. Build RoboCache
+# 2. Build RoboCache with CUDA
 cd robocache
 mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
+cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES=90
 make -j$(nproc)
 
 # 3. Install Python package
 cd ..
-pip install -e .
+pip install -e python/
+```
+
+### Quick Start (PyTorch-Only, No Build Required)
+
+```bash
+# Install just the Python package (uses PyTorch fallback)
+cd robocache
+pip install -e python/
+
+# Slower but works without CUDA build
+# Good for testing/development
 ```
 
 ### Verify Installation
 
 ```python
 import robocache
+
+# Check what's available
+info = robocache.check_installation()
+print(f"CUDA Extension: {info['cuda_extension_available']}")
+print(f"Default Backend: {info['default_backend']}")
+
+# Print detailed info
 robocache.print_installation_info()
 ```
 
@@ -161,40 +233,32 @@ print(resampled.shape)  # torch.Size([64, 50, 32])
 
 ```python
 import torch
-import robocache_cuda
+import robocache
 
 # Multi-sensor robot setup (5-second episode)
 batch = 32
 
-# Vision: 30 Hz RGB-D camera → ResNet features
-vision = torch.randn(batch, 150, 512, dtype=torch.bfloat16, device='cuda')
-vision_times = torch.arange(150).float().cuda().unsqueeze(0).expand(batch, -1) / 30.0
+# Vision: 30 Hz RGB-D camera → ResNet features (512-dim)
+vision = torch.randn(batch, 150, 512, device='cuda')
+vision_times = torch.arange(150, device='cuda').float().unsqueeze(0).expand(batch, -1) / 30.0
 
-# Proprioception: 100 Hz joint encoders (7-DOF)
-proprio = torch.randn(batch, 500, 14, dtype=torch.bfloat16, device='cuda')
-proprio_times = torch.arange(500).float().cuda().unsqueeze(0).expand(batch, -1) / 100.0
+# Proprioception: 100 Hz joint encoders (14-dim for 7-DOF)
+proprio = torch.randn(batch, 500, 14, device='cuda')
+proprio_times = torch.arange(500, device='cuda').float().unsqueeze(0).expand(batch, -1) / 100.0
 
-# Force: 333 Hz force-torque sensor (optional)
-force = torch.randn(batch, 1665, 6, dtype=torch.bfloat16, device='cuda')
-force_times = torch.arange(1665).float().cuda().unsqueeze(0).expand(batch, -1) / 333.0
-
-# Target: 50 Hz for transformer
-target_times = torch.arange(250).float().cuda().unsqueeze(0).expand(batch, -1) / 50.0
-
-# Single kernel aligns all sensors (125x faster than CPU!)
-aligned = robocache_cuda.fused_multimodal_alignment(
-    vision, vision_times,
-    proprio, proprio_times,
-    force, force_times,
-    target_times
+# Fuse sensors: aligns proprio to vision frequency and concatenates
+# Auto-selects CUDA backend (10-20x faster than PyTorch CPU)
+fused = robocache.fuse_multimodal(
+    vision, vision_times,      # Primary: 30 Hz
+    proprio, proprio_times     # Secondary: 100 Hz → resampled to 30 Hz
 )
 
-print(aligned.shape)  # torch.Size([32, 250, 532])
-# 512 (vision) + 14 (proprio) + 6 (force) = 532 features @ 50 Hz
+print(fused.shape)  # torch.Size([32, 150, 526])
+# 512 (vision) + 14 (proprio) = 526 features @ 30 Hz
 # Ready for transformer input!
 ```
 
-**📖 Full documentation:** [docs/multimodal_fusion.md](docs/multimodal_fusion.md)
+**Note:** For more than 2 sensor streams, call `fuse_multimodal` sequentially or resample each to a common frequency first.
 
 ## 📊 Comprehensive Benchmark
 

@@ -174,9 +174,9 @@ void print_header() {
     std::cout << "GPU: " << prop.name << "\n";
     std::cout << "Compute Capability: " << prop.major << "." << prop.minor << "\n";
     std::cout << "Memory: " << (prop.totalGlobalMem / (1024 * 1024 * 1024)) << " GB\n";
-    std::cout << "Peak Memory Bandwidth: "
-              << (2.0 * prop.memoryClockRate * (prop.memoryBusWidth / 8) / 1.0e6)
-              << " GB/s\n";
+    // Note: memoryClockRate deprecated in CUDA 13.0+
+    // Use cudaDeviceGetAttribute with cudaDevAttrMemoryClockRate if needed
+    std::cout << "Memory Bus Width: " << prop.memoryBusWidth << " bits\n";
     std::cout << "\n";
 }
 
