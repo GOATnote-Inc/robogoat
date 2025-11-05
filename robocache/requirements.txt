@@ -1,0 +1,15 @@
+# RoboCache Production Dependencies
+# Pinned for security and reproducibility
+
+# Core dependencies
+torch>=2.0.0,<3.0.0
+numpy>=1.21.0,<2.0.0
+
+# Optional: CUDA toolkit (system-level, not pip installable)
+# - CUDA 11.8 or 12.1
+# - cuDNN 8.x
+# - CUTLASS 4.3.0 (included in repo)
+
+# Development dependencies (install with: pip install -e .[dev])
+# See pyproject.toml [project.optional-dependencies]
+
