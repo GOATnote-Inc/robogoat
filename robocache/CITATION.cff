@@ -1,0 +1,35 @@
+cff-version: 1.2.0
+message: "If you use RoboCache in your research, please cite it as below."
+title: "RoboCache: High-Performance GPU-Accelerated Data Engine for Robot Learning"
+abstract: "RoboCache is a production-grade GPU library for accelerating robotics data processing, featuring trajectory resampling, multimodal sensor fusion, and point cloud voxelization. Optimized for NVIDIA H100 with expert-level CUDA engineering, comprehensive error handling, multi-GPU support, and TCO-aware memory management."
+type: software
+authors:
+  - family-names: "RoboCache Team"
+    affiliation: "GOATnote Inc"
+version: 0.2.0
+date-released: 2025-11-05
+license: Apache-2.0
+repository-code: "https://github.com/GOATnote-Inc/robogoat"
+keywords:
+  - GPU
+  - CUDA
+  - Robotics
+  - Machine Learning
+  - Point Cloud
+  - Voxelization
+  - NVIDIA H100
+  - Hopper
+  - High Performance Computing
+  - Trajectory Processing
+  - Sensor Fusion
+preferred-citation:
+  type: software
+  title: "RoboCache: High-Performance GPU-Accelerated Data Engine for Robot Learning"
+  authors:
+    - family-names: "RoboCache Team"
+      affiliation: "GOATnote Inc"
+  year: 2025
+  version: 0.2.0
+  repository-code: "https://github.com/GOATnote-Inc/robogoat"
+  license: Apache-2.0
+

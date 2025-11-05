@@ -8,10 +8,14 @@ RoboCache eliminates data preprocessing as the bottleneck in robot learning. Bui
 
 **⚡ [Quick Start](QUICK_START_BENCHMARK.md)** | **📊 [Benchmarks](BENCHMARK_RESULTS_H100.md)** | **🗺️ [Roadmap](STRATEGIC_ROADMAP.md)** | **📈 [Status](PROJECT_STATUS.md)**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![CUDA](https://img.shields.io/badge/CUDA-13.x-green.svg)](https://developer.nvidia.com/cuda-toolkit)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![CUDA](https://img.shields.io/badge/CUDA-12.0+-green.svg)](https://developer.nvidia.com/cuda-toolkit)
 [![CUTLASS](https://img.shields.io/badge/CUTLASS-4.3.0-blue.svg)](https://github.com/NVIDIA/cutlass)
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
+[![Code of Conduct](https://img.shields.io/badge/Contributor%20Covenant-2.0-4baaaa.svg)](CODE_OF_CONDUCT.md)
+[![Security](https://img.shields.io/badge/Security-Policy-red.svg)](SECURITY.md)
+
+**🛡️ [Security Policy](SECURITY.md)** | **🤝 [Contributing](CONTRIBUTING.md)** | **📜 [Code of Conduct](CODE_OF_CONDUCT.md)** | **📖 [Citation](CITATION.cff)**
 
 ## 🚀 Key Features
 
