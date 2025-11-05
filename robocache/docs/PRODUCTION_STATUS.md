@@ -490,9 +490,9 @@ RoboCache is ready for adoption in NVIDIA's robotics research and production pip
 
 **Project:** https://github.com/robocache/robocache  
 **Documentation:** https://robocache.readthedocs.io  
-**Issues:** https://github.com/robocache/robocache/issues  
-**Security:** security@robogoat.ai  
-**General:** team@robocache.ai
+**Issues:** https://github.com/GOATnote-Inc/robogoat/issues  
+**Security:** b@thegoatnote.com  
+**General:** b@thegoatnote.com
 
 ---
 

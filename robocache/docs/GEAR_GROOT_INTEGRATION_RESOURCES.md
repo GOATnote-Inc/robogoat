@@ -496,7 +496,7 @@ for batch in loader:
 **For NVIDIA Collaboration:**
 - NVIDIA Robotics: https://developer.nvidia.com/isaac
 - NVIDIA Research: https://www.nvidia.com/en-us/research/robotics/
-- Contact: team@robocache.ai
+- Contact: b@thegoatnote.com
 
 **For Public Datasets:**
 - RT-X: https://robotics-transformer-x.github.io/

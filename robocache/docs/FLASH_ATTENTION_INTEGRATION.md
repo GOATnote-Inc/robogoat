@@ -361,5 +361,5 @@ class RobotVisionLanguageActionModel(nn.Module):
 
 **Philosophy:** Stand on the shoulders of giants. Flash Attention 3 is a giant. Use it.
 
-**Contact:** team@robocache.ai
+**Contact:** b@thegoatnote.com
 

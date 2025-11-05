@@ -350,5 +350,5 @@ ncu --set full \
 
 **Philosophy:** Use the best tool for the job. Pride has no place in engineering. If Flash Attention 3 is faster, use it. If our kernel is faster, use ours. Always back claims with NCU data.
 
-**Contact:** team@robocache.ai for technical discussions
+**Contact:** b@thegoatnote.com for technical discussions
 

@@ -234,6 +234,6 @@ If users report installation problems:
 ## Contact
 
 For release questions:
-- GitHub Issues: https://github.com/robocache/robocache/issues
-- Email: team@robocache.ai
+- GitHub Issues: https://github.com/GOATnote-Inc/robogoat/issues
+- Email: b@thegoatnote.com
 
