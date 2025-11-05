@@ -36,17 +36,35 @@ dist/
 *.fatbin
 *.ptx
 
-# Profiling
+# Profiling and NCU reports
 *.nvvp
 *.qdrep
 *.sqlite
-*.ncu-rep
-*.nsys-rep
+ncu_reports/
+docs/perf/ncu_reports/*.ncu-rep
 
-# Logs
+# Logs and validation outputs
 *.log
+*_validation.txt
+*_h100*.txt
+phase*_*.txt
+production_validation*.txt
+h100_*.txt
 
-# Backup files
-*~
+# Temporary files
+*.tar.gz
 *.bak
 *.orig
+*~
+
+# Shell scripts (temporary/local)
+execute_build.sh
+gpu_build_and_test.sh
+remote_build.sh
+build_and_test*.sh
+RUN_*.sh
+DEPLOY_*.sh
+VALIDATE_*.sh
+
+# Test outputs
+FINAL_*.txt
