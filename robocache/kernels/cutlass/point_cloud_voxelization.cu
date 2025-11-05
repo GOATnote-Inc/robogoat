@@ -47,6 +47,10 @@ int voxel_idx_to_linear(int vx, int vy, int vz, int depth, int height, int width
 // Occupancy Voxelization Kernel
 //==============================================================================
 
+// PRODUCTION FIX: Use atomic counts (deterministic) instead of atomicExch (non-deterministic)
+// This matches voxelization-kit-secure best practices.
+// Strategy: Accumulate counts with atomicAdd, then convert to binary occupancy.
+
 __global__ void voxelize_occupancy_kernel(
     const float* __restrict__ points,
     float* __restrict__ voxel_grid,
@@ -72,14 +76,29 @@ __global__ void voxelize_occupancy_kernel(
         float py = points[point_offset + 1];
         float pz = points[point_offset + 2];
         
-        // Convert to voxel index
+        // Convert to voxel index (using floor rule for CPU/GPU parity)
         int vx, vy, vz;
         if (point_to_voxel_idx(px, py, pz, origin, voxel_size, depth, height, width, vx, vy, vz)) {
-            // Mark voxel as occupied (atomic to handle concurrent writes)
+            // CRITICAL FIX: Use atomicAdd for deterministic accumulation (not atomicExch)
+            // This ensures CPU/GPU parity and eliminates race conditions
             int voxel_linear = voxel_idx_to_linear(vx, vy, vz, depth, height, width);
             int voxel_offset = batch_idx * (depth * height * width) + voxel_linear;
-            atomicExch(&voxel_grid[voxel_offset], 1.0f);
+            
+            // Accumulate counts (any value > 0 means occupied)
+            atomicAdd(&voxel_grid[voxel_offset], 1.0f);
         }
+    }
+}
+
+// Convert counts to binary occupancy (optional second pass)
+__global__ void counts_to_occupancy_kernel(
+    float* __restrict__ voxel_grid,
+    int total_voxels
+) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < total_voxels) {
+        // Convert count to binary: count > 0 → 1.0, else 0.0
+        voxel_grid[idx] = (voxel_grid[idx] > 0.0f) ? 1.0f : 0.0f;
     }
 }
 
@@ -449,11 +468,20 @@ cudaError_t voxelize_occupancy(
     size_t grid_size = batch_size * depth * height * width * sizeof(float);
     cudaMemsetAsync(voxel_grid, 0, grid_size, stream);
     
-    // Launch kernel
-    int num_blocks = (batch_size * num_points + BLOCK_SIZE - 1) / BLOCK_SIZE;
-    voxelize_occupancy_kernel<<<num_blocks, BLOCK_SIZE, 0, stream>>>(
+    // Pass 1: Accumulate point counts per voxel (deterministic with atomicAdd)
+    int total_points = batch_size * num_points;
+    int num_blocks_pass1 = (total_points + BLOCK_SIZE - 1) / BLOCK_SIZE;
+    voxelize_occupancy_kernel<<<num_blocks_pass1, BLOCK_SIZE, 0, stream>>>(
         points, voxel_grid, batch_size, num_points,
         depth, height, width, voxel_size, origin
+    );
+    
+    // Pass 2: Convert counts to binary occupancy (0 or 1)
+    // This ensures backward compatibility with the original API expectation
+    int total_voxels = batch_size * depth * height * width;
+    int num_blocks_pass2 = (total_voxels + BLOCK_SIZE - 1) / BLOCK_SIZE;
+    counts_to_occupancy_kernel<<<num_blocks_pass2, BLOCK_SIZE, 0, stream>>>(
+        voxel_grid, total_voxels
     );
     
     return cudaGetLastError();

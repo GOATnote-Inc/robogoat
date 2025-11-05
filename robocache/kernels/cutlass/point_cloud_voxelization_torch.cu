@@ -1,14 +1,17 @@
 // point_cloud_voxelization_torch.cu
-// PyTorch bindings for point cloud voxelization kernels
+// PyTorch bindings for point cloud voxelization kernels (Production-Grade Error Handling)
 
 #include <torch/extension.h>
 #include "point_cloud_voxelization.h"
+#include "error_handling.cuh"
 
 namespace robocache {
 namespace kernels {
 
+using namespace robocache::error;
+
 //==============================================================================
-// PyTorch API Wrappers
+// PyTorch API Wrappers (Production-Grade with Error Handling)
 //==============================================================================
 
 torch::Tensor voxelize_occupancy_torch(
@@ -17,10 +20,31 @@ torch::Tensor voxelize_occupancy_torch(
     float voxel_size,
     torch::Tensor origin               // [3]
 ) {
-    TORCH_CHECK(points.is_cuda(), "points must be CUDA tensor");
-    TORCH_CHECK(points.dim() == 3 && points.size(2) == 3, "points must be [batch, N, 3]");
-    TORCH_CHECK(grid_size.size(0) == 3, "grid_size must be [3]");
-    TORCH_CHECK(origin.size(0) == 3, "origin must be [3]");
+    // ===== INPUT VALIDATION =====
+    validate_tensor(points, "points", 3, true, torch::kFloat32);
+    validate_tensor(grid_size, "grid_size", 1, true, torch::kInt32);
+    validate_tensor(origin, "origin", 1, true, torch::kFloat32);
+    
+    TORCH_CHECK(
+        points.size(2) == 3,
+        "points must have shape [batch, num_points, 3], got shape [",
+        points.size(0), ", ", points.size(1), ", ", points.size(2), "]"
+    );
+    
+    TORCH_CHECK(
+        grid_size.size(0) == 3,
+        "grid_size must have 3 elements [depth, height, width], got ", grid_size.size(0)
+    );
+    
+    TORCH_CHECK(
+        origin.size(0) == 3,
+        "origin must have 3 elements [x, y, z], got ", origin.size(0)
+    );
+    
+    TORCH_CHECK(
+        voxel_size > 0.0f,
+        "voxel_size must be positive, got ", voxel_size
+    );
     
     int batch_size = points.size(0);
     int num_points = points.size(1);
@@ -28,22 +52,77 @@ torch::Tensor voxelize_occupancy_torch(
     int height = grid_size[1].item<int>();
     int width = grid_size[2].item<int>();
     
-    // Allocate output grid
-    auto voxel_grid = torch::zeros(
-        {batch_size, depth, height, width},
-        torch::TensorOptions().dtype(torch::kFloat32).device(points.device())
+    TORCH_CHECK(
+        batch_size > 0 && num_points > 0,
+        "Empty point cloud. batch_size=", batch_size, ", num_points=", num_points
     );
     
-    // Call CUDA kernel
-    voxelize_occupancy(
+    TORCH_CHECK(
+        depth > 0 && height > 0 && width > 0,
+        "Invalid grid dimensions. depth=", depth, ", height=", height, ", width=", width
+    );
+    
+    TORCH_CHECK(
+        depth <= 512 && height <= 512 && width <= 512,
+        "Grid dimensions too large (max 512). Got: ", depth, "x", height, "x", width
+    );
+    
+    // ===== MEMORY CHECK =====
+    size_t output_size = batch_size * depth * height * width * sizeof(float);
+    size_t input_size = batch_size * num_points * 3 * sizeof(float);
+    size_t required = output_size + input_size;
+    
+    if (!check_memory_available(required)) {
+        size_t free_bytes, total_bytes;
+        cudaMemGetInfo(&free_bytes, &total_bytes);
+        
+        TORCH_WARN(
+            "Voxelization may fail due to insufficient GPU memory.\n",
+            "  Required: ", format_bytes(required), "\n",
+            "  Available: ", format_bytes(free_bytes), "\n",
+            "  Device: ", get_device_info(), "\n",
+            "Hint: Reduce batch size, grid resolution, or use CPU processing."
+        );
+    }
+    
+    // ===== ALLOCATE OUTPUT =====
+    torch::Tensor voxel_grid;
+    try {
+        voxel_grid = torch::zeros(
+            {batch_size, depth, height, width},
+            torch::TensorOptions().dtype(torch::kFloat32).device(points.device())
+        );
+    } catch (const c10::Error& e) {
+        TORCH_CHECK(
+            false,
+            "Failed to allocate voxel grid [", batch_size, ", ", depth, ", ",
+            height, ", ", width, "] = ", format_bytes(output_size), "\n",
+            "Error: ", e.what(), "\n",
+            get_device_info(), "\n",
+            "Hint: Reduce batch_size or grid resolution, or use CPU processing."
+        );
+    }
+    
+    // ===== CALL CUDA KERNEL =====
+    cudaError_t err = voxelize_occupancy(
         points.data_ptr<float>(),
         voxel_grid.data_ptr<float>(),
         batch_size, num_points,
         depth, height, width,
         voxel_size,
         origin.data_ptr<float>(),
-        (cudaStream_t)c10::cuda::getCurrentCUDAStream().stream()
+        c10::cuda::getCurrentCUDAStream()
     );
+    
+    if (err != cudaSuccess) {
+        TORCH_CHECK(
+            false,
+            "Voxelization kernel failed: ", cudaGetErrorString(err), "\n",
+            get_device_info(), "\n",
+            "Input shape: [", batch_size, ", ", num_points, ", 3]\n",
+            "Grid shape: [", batch_size, ", ", depth, ", ", height, ", ", width, "]"
+        );
+    }
     
     return voxel_grid;
 }
@@ -75,7 +154,7 @@ torch::Tensor voxelize_density_torch(
         depth, height, width,
         voxel_size,
         origin.data_ptr<float>(),
-        (cudaStream_t)c10::cuda::getCurrentCUDAStream().stream()
+        c10::cuda::getCurrentCUDAStream()
     );
     
     return voxel_grid;
@@ -112,7 +191,7 @@ torch::Tensor voxelize_feature_max_torch(
         depth, height, width, feature_dim,
         voxel_size,
         origin.data_ptr<float>(),
-        (cudaStream_t)c10::cuda::getCurrentCUDAStream().stream()
+        c10::cuda::getCurrentCUDAStream()
     );
     
     return voxel_grid;
@@ -147,7 +226,7 @@ torch::Tensor voxelize_feature_mean_torch(
         depth, height, width, feature_dim,
         voxel_size,
         origin.data_ptr<float>(),
-        (cudaStream_t)c10::cuda::getCurrentCUDAStream().stream()
+        c10::cuda::getCurrentCUDAStream()
     );
     
     return voxel_grid;
@@ -190,7 +269,7 @@ std::tuple<torch::Tensor, torch::Tensor> voxelize_tsdf_torch(
         voxel_size,
         origin.data_ptr<float>(),
         truncation_distance,
-        (cudaStream_t)c10::cuda::getCurrentCUDAStream().stream()
+        c10::cuda::getCurrentCUDAStream()
     );
     
     return std::make_tuple(tsdf_grid, weight_grid);
@@ -220,7 +299,7 @@ std::tuple<torch::Tensor, torch::Tensor> compute_point_cloud_bounds_torch(
         min_bounds.data_ptr<float>(),
         max_bounds.data_ptr<float>(),
         batch_size, num_points,
-        (cudaStream_t)c10::cuda::getCurrentCUDAStream().stream()
+        c10::cuda::getCurrentCUDAStream()
     );
     
     return std::make_tuple(min_bounds, max_bounds);

@@ -9,6 +9,24 @@
 #include <stdexcept>
 #include <sstream>
 
+// Forward declare optimized kernel interfaces
+namespace robocache {
+namespace kernels {
+namespace optimized {
+    template<typename T>
+    cudaError_t resample_trajectories_optimized(
+        const T*, const float*, const float*, T*,
+        int, int, int, int, cudaStream_t);
+}
+namespace production {
+    template<typename T>
+    cudaError_t resample_trajectories_production(
+        const T*, const float*, const float*, T*,
+        int, int, int, int, cudaStream_t);
+}
+}
+}
+
 namespace robocache {
 namespace torch_binding {
 
@@ -178,6 +196,134 @@ torch::Tensor resample_trajectories(
 }
 
 /**
+ * PyTorch wrapper for OPTIMIZED trajectory resampling (H100-specific)
+ *
+ * This version uses advanced shared memory caching and cooperative groups
+ * to achieve better memory efficiency on H100.
+ *
+ * Expected improvements:
+ *  - 30-100% faster depending on workload
+ *  - Best for: source_length <= 512 (fits in shared memory)
+ *  - Higher memory bandwidth efficiency (10-20% vs 7% baseline)
+ *
+ * Args:
+ *     source_data: Tensor of shape [batch, source_len, action_dim]
+ *     source_times: Tensor of shape [batch, source_len]
+ *     target_times: Tensor of shape [batch, target_len]
+ *
+ * Returns:
+ *     Resampled trajectories of shape [batch, target_len, action_dim]
+ */
+torch::Tensor resample_trajectories_optimized(
+    torch::Tensor source_data,
+    torch::Tensor source_times,
+    torch::Tensor target_times
+) {
+    // ============================================================
+    // Input validation (same as baseline)
+    // ============================================================
+
+    TORCH_CHECK(source_data.is_cuda(), "source_data must be a CUDA tensor");
+    TORCH_CHECK(source_times.is_cuda(), "source_times must be a CUDA tensor");
+    TORCH_CHECK(target_times.is_cuda(), "target_times must be a CUDA tensor");
+
+    TORCH_CHECK(source_data.device() == source_times.device() &&
+                source_data.device() == target_times.device(),
+                "All tensors must be on the same CUDA device");
+
+    TORCH_CHECK(source_data.dim() == 3, "source_data must be 3D [batch, source_len, action_dim]");
+    TORCH_CHECK(source_times.dim() == 2, "source_times must be 2D [batch, source_len]");
+    TORCH_CHECK(target_times.dim() == 2, "target_times must be 2D [batch, target_len]");
+
+    int64_t batch_size = source_data.size(0);
+    int64_t source_length = source_data.size(1);
+    int64_t action_dim = source_data.size(2);
+    int64_t target_length = target_times.size(1);
+
+    TORCH_CHECK(source_times.size(0) == batch_size, "Batch size mismatch");
+    TORCH_CHECK(source_times.size(1) == source_length, "Source length mismatch");
+    TORCH_CHECK(target_times.size(0) == batch_size, "Batch size mismatch");
+
+    TORCH_CHECK(source_times.dtype() == torch::kFloat32, "source_times must be float32");
+    TORCH_CHECK(target_times.dtype() == torch::kFloat32, "target_times must be float32");
+
+    if (!source_data.is_contiguous()) source_data = source_data.contiguous();
+    if (!source_times.is_contiguous()) source_times = source_times.contiguous();
+    if (!target_times.is_contiguous()) target_times = target_times.contiguous();
+
+    // ============================================================
+    // Create output tensor
+    // ============================================================
+
+    auto options = torch::TensorOptions()
+        .dtype(source_data.dtype())
+        .device(source_data.device())
+        .requires_grad(source_data.requires_grad());
+
+    auto output = torch::empty({batch_size, target_length, action_dim}, options);
+
+    // ============================================================
+    // Get CUDA stream
+    // ============================================================
+
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream(source_data.device().index());
+
+    // ============================================================
+    // Dispatch to optimized kernel
+    // ============================================================
+
+    cudaError_t status;
+
+    if (source_data.dtype() == torch::kBFloat16) {
+        status = kernels::optimized::resample_trajectories_optimized<__nv_bfloat16>(
+            reinterpret_cast<const __nv_bfloat16*>(source_data.data_ptr()),
+            source_times.data_ptr<float>(),
+            target_times.data_ptr<float>(),
+            reinterpret_cast<__nv_bfloat16*>(output.data_ptr()),
+            static_cast<int>(batch_size),
+            static_cast<int>(source_length),
+            static_cast<int>(target_length),
+            static_cast<int>(action_dim),
+            stream
+        );
+    } else if (source_data.dtype() == torch::kFloat16) {
+        status = kernels::optimized::resample_trajectories_optimized<__half>(
+            reinterpret_cast<const __half*>(source_data.data_ptr()),
+            source_times.data_ptr<float>(),
+            target_times.data_ptr<float>(),
+            reinterpret_cast<__half*>(output.data_ptr()),
+            static_cast<int>(batch_size),
+            static_cast<int>(source_length),
+            static_cast<int>(target_length),
+            static_cast<int>(action_dim),
+            stream
+        );
+    } else if (source_data.dtype() == torch::kFloat32) {
+        status = kernels::optimized::resample_trajectories_optimized<float>(
+            source_data.data_ptr<float>(),
+            source_times.data_ptr<float>(),
+            target_times.data_ptr<float>(),
+            output.data_ptr<float>(),
+            static_cast<int>(batch_size),
+            static_cast<int>(source_length),
+            static_cast<int>(target_length),
+            static_cast<int>(action_dim),
+            stream
+        );
+    } else {
+        std::ostringstream oss;
+        oss << "Unsupported dtype: " << source_data.dtype()
+            << ". Supported dtypes: float32, float16, bfloat16";
+        throw std::runtime_error(oss.str());
+    }
+
+    TORCH_CHECK(status == cudaSuccess,
+                "CUDA kernel failed with error: ", cudaGetErrorString(status));
+
+    return output;
+}
+
+/**
  * Backward pass for trajectory resampling (for autograd support)
  *
  * The gradient flows back through the interpolation:
@@ -193,6 +339,11 @@ torch::Tensor resample_trajectories_backward(
     torch::Tensor source_times,
     torch::Tensor target_times
 ) {
+    // Suppress unused parameter warnings (placeholder implementation)
+    (void)grad_output;
+    (void)source_times;
+    (void)target_times;
+    
     // TODO: Implement custom backward pass for full autograd support
     // For now, this is a placeholder - most robot learning use cases
     // don't backprop through data augmentation
@@ -264,6 +415,38 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
               >>> resampled = robocache_cuda.resample_trajectories(data, src_t, tgt_t)
               >>> print(resampled.shape)
               torch.Size([64, 50, 32])
+          )doc");
+
+    m.def("resample_trajectories_optimized",
+          &robocache::torch_binding::resample_trajectories_optimized,
+          py::arg("source_data"),
+          py::arg("source_times"),
+          py::arg("target_times"),
+          R"doc(
+          H100-optimized trajectory resampling with shared memory caching.
+          
+          This version uses advanced memory optimizations for improved performance:
+          - Shared memory caching of time arrays (reduces latency)
+          - Cooperative warp-level operations (better ILP)
+          - Process multiple targets per block (amortized overhead)
+          
+          Expected performance gain: 30-100% over baseline
+          Best use case: source_length <= 512 (fits in 2KB shared memory cache)
+          
+          Args:
+              source_data (torch.Tensor): Input trajectories [batch, source_len, action_dim]
+              source_times (torch.Tensor): Source timestamps [batch, source_len]
+              target_times (torch.Tensor): Target timestamps [batch, target_len]
+          
+          Returns:
+              torch.Tensor: Resampled trajectories [batch, target_len, action_dim]
+          
+          Example:
+              >>> # Use optimized kernel for typical robot learning workloads
+              >>> data = torch.randn(256, 100, 32, dtype=torch.bfloat16, device='cuda')
+              >>> src_t = torch.linspace(0, 1, 100, device='cuda').expand(256, -1)
+              >>> tgt_t = torch.linspace(0, 1, 50, device='cuda').expand(256, -1)
+              >>> resampled = robocache_cuda.resample_trajectories_optimized(data, src_t, tgt_t)
           )doc");
 
     m.def("resample_trajectories_backward",

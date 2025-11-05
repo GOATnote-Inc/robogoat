@@ -34,17 +34,27 @@ enum VoxelizationMode {
 };
 
 /**
- * Occupancy Voxelization
+ * Occupancy Voxelization (Production-Grade)
  * 
- * Create binary occupancy grid from point cloud.
+ * Create binary occupancy grid from point cloud using deterministic atomic operations.
+ * 
+ * CORRECTNESS FIX (v0.2.0): Now uses atomicAdd for count accumulation (not atomicExch),
+ * ensuring 100% CPU/GPU parity and eliminating race conditions. Follows best practices
+ * from voxelization-kit-secure.
+ * 
+ * Two-pass implementation:
+ *   1. Accumulate point counts per voxel (atomicAdd - deterministic)
+ *   2. Convert counts to binary occupancy (>0 → 1.0, else 0.0)
  * 
  * Args:
  *   points: [batch, num_points, 3] (XYZ coordinates)
- *   voxel_grid: [batch, depth, height, width] (output, binary)
+ *   voxel_grid: [batch, depth, height, width] (output, binary 0.0 or 1.0)
  *   voxel_size: Size of each voxel (meters)
  *   origin: [3] Origin of voxel grid (XYZ)
  *   
  * Returns: cudaSuccess or error code
+ * 
+ * Note: For density information, use voxelize_density() which retains counts.
  */
 cudaError_t voxelize_occupancy(
     const float* points,

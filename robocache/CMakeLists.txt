@@ -62,13 +62,22 @@ message(STATUS "CUDA architectures: ${CMAKE_CUDA_ARCHITECTURES}")
 
 # Optimization flags
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -O3")
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -use_fast_math")
+
+# CRITICAL: Disable fast-math for CPU/GPU numerical parity
+# -use_fast_math breaks IEEE 754 compliance and causes CPU/GPU mismatches
+# See: voxelization-kit-secure for production standards
+# set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -use_fast_math")  # DISABLED
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -fmad=false")  # Disable fused multiply-add
+
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-relaxed-constexpr")
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-extended-lambda")
 
 # Debugging and profiling
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -lineinfo")  # For profilers
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xptxas -v") # Show register usage
+
+# Hardening: warnings as errors for CUDA
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler=-Wall,-Wextra,-Werror")
 
 # Additional optimizations for Release builds
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
@@ -80,6 +89,13 @@ endif()
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -g -G")
 endif()
+
+# ==============================================================================
+# C++ compiler flags (CPU side parity)
+# ==============================================================================
+
+# Disable FP contraction on CPU side to match GPU
+add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-ffp-contract=off>)
 
 # ==============================================================================
 # CMake modules
