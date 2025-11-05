@@ -4,7 +4,7 @@
 
 **The missing GPU-accelerated data engine for robot foundation models.**
 
-RoboCache eliminates data preprocessing as the bottleneck in robot learning. Built for NVIDIA H100 with multi-backend support (CUDA/PyTorch), it provides 22-581x speedups on operations critical for training embodied AI.
+RoboCache eliminates data preprocessing as the bottleneck in robot learning. Built for NVIDIA H100 with multi-backend support (CUDA/PyTorch), it provides measured speedups (3.95x for trajectory resampling, validated on H100) on operations critical for training embodied AI, with additional optimizations in development.
 
 **⚡ [Quick Start](QUICK_START_BENCHMARK.md)** | **📊 [Benchmarks](BENCHMARK_RESULTS_H100.md)** | **🗺️ [Roadmap](STRATEGIC_ROADMAP.md)** | **📈 [Status](PROJECT_STATUS.md)** | **⚠️ [Known Limitations](KNOWN_LIMITATIONS.md)**
 
@@ -20,9 +20,9 @@ RoboCache eliminates data preprocessing as the bottleneck in robot learning. Bui
 ## 🚀 Key Features (v0.2.1)
 
 - **Multi-Backend Architecture**: Auto-selects CUDA for performance, falls back to PyTorch for compatibility
-- **Phase 1-3 Complete**: Trajectory resampling, multimodal fusion, and voxelization (581x speedup)
-- **22-581x Speedup**: H100-optimized CUDA kernels with BF16 Tensor Core acceleration
-- **Production Ready**: NCU profiled, CPU/GPU parity validated, comprehensive error handling
+- **Phase 1 Validated**: Trajectory resampling with 3.95x speedup vs PyTorch baseline (H100 measured)
+- **Production-Grade Validation**: NCU profiled, correctness tests with CPU reference, automated CI pipeline
+- **Evidence-Based Claims**: All performance numbers linked to machine-readable benchmark artifacts
 - **Fully Tested**: 180+ test cases covering correctness, edge cases, and multi-backend consistency
 - **Easy Integration**: Simple Python API with automatic backend selection
 - **PyTorch Fallback**: Works without CUDA (slower, but functional for development/testing)
@@ -51,9 +51,14 @@ Convert variable-frequency robot trajectories to uniform sampling rate using GPU
 
 | Backend | Latency | Speedup | Use Case |
 |---------|---------|---------|----------|
-| **CUDA BF16** | **0.125ms** | **22x** | Production (auto-selected) 🏆 |
-| PyTorch (GPU) | ~2.7ms | 1.0x | Compatibility/Fallback |
-| PyTorch (CPU) | ~30ms | 0.08x | Development/Testing |
+| **CUDA BF16 (Optimized)** | **0.183ms** | **3.95x** | Production (auto-selected) 🏆 |
+| PyTorch (GPU) | 0.724ms | 1.0x | Compatibility/Fallback |
+
+📊 **[View H100 Validation Report](benchmarks/results/h100_validated_20251105.json)** | **[NCU Profiling Guide](docs/perf/NCU_PROFILING_GUIDE.md)**
+
+**Measured on:** H100 PCIe, CUDA 13.0, Driver 580.95.05, PyTorch 2.10.0.dev  
+**Optimizations:** Shared memory timestamp caching (16KB), vectorized BF16 processing (float4), cooperative loading, binary search on shared memory  
+**NCU Metrics:** DRAM BW 1.59%, SM Util 56.55%
 
 **API:**
 ```python
