@@ -1,0 +1,41 @@
+{
+  "system": {
+    "timestamp": "2025-11-05T12:42:53.819089",
+    "hostname": "brev-e5juayzrv",
+    "cuda_available": true,
+    "cuda_version": "13.0",
+    "device_name": "NVIDIA H100 PCIe",
+    "device_capability": [9, 0],
+    "driver_version": "580.95.05",
+    "gpu_clocks": "1755 MHz, 1593 MHz",
+    "pytorch_version": "2.10.0.dev20251101+cu130"
+  },
+  "benchmarks": {
+    "trajectory_resampling": [
+      {
+        "kernel": "trajectory_resampling",
+        "config": {
+          "batch": 64,
+          "src_len": 4096,
+          "tgt_len": 1024,
+          "dim": 32
+        },
+        "optimized": {
+          "mean_ms": 0.19034647120861337,
+          "min_ms": 0.18924401956610382,
+          "max_ms": 0.20496599609032273,
+          "iterations": 100
+        },
+        "baseline": {
+          "mean_ms": 0.14015480905072764,
+          "min_ms": 0.13414098066277802,
+          "max_ms": 0.16049100668169558,
+          "iterations": 100
+        },
+        "speedup": 0.7363141967424374,
+        "notes": "Optimized kernel shows 0.74x performance vs PyTorch baseline. Requires investigation of performance regression compared to earlier manual benchmarks that showed 3.95x speedup."
+      }
+    ]
+  }
+}
+
