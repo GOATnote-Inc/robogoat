@@ -42,9 +42,31 @@ from typing import Optional
 
 # Try to import backends
 try:
-    from . import robocache_cuda
+    import torch
+    from torch.utils.cpp_extension import load
+    import os
+    
+    # Get kernel directory
+    kernel_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'kernels', 'cutlass')
+    
+    # Build optimized kernel with shared memory + vectorization
+    robocache_cuda = load(
+        name='robocache_cuda_optimized',
+        sources=[
+            os.path.join(kernel_dir, 'trajectory_resample_optimized_v2.cu'),
+            os.path.join(kernel_dir, 'trajectory_resample_optimized_v2_torch.cu'),
+        ],
+        extra_cuda_cflags=[
+            '-O3',
+            '--use_fast_math',
+            '-lineinfo',
+            '--expt-relaxed-constexpr',
+            '-std=c++17',
+        ],
+        verbose=True
+    )
     _CUDA_AVAILABLE = True
-except ImportError as e:
+except Exception as e:
     _CUDA_AVAILABLE = False
     _CUDA_IMPORT_ERROR = str(e)
 
