@@ -309,11 +309,12 @@ pip install -e .
 - Performance: Measured in production benchmarks
 
 **End-to-End Pipeline:**
-- GPU Utilization: 100% sustained (exceeds 95%+ target)
+- GPU Utilization: 92-95% sustained (synthetic benchmark)*
 - Model: Diffusion Transformer (300M params)
 - Batch Size: 128
-- Data Generation: GPU-side (eliminates CPU→GPU bottleneck)
-- Status: ✅ H100-validated
+- Data Generation: GPU-side (NOT representative of production)
+- Status: ✅ H100-validated, see KNOWN_LIMITATIONS.md for caveats
+- **Production estimate:** 50-85% depending on dataloader quality
 
 ---
 

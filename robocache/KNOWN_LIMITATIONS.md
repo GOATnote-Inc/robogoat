@@ -16,7 +16,7 @@ This document provides an honest assessment of current limitations and planned i
 - ✅ Multi-backend architecture: CUDA (optimized) + PyTorch (fallback)
 - ✅ Correctness validation: CPU reference comparison, zero-tolerance testing
 - ✅ NCU profiling infrastructure: Reproducible performance measurement
-- ✅ **End-to-end pipeline: 100% steady-state GPU utilization on H100**
+- ✅ **End-to-end pipeline: 92-95% GPU utilization on H100*** (synthetic benchmark, see caveats)
 
 **What's In Progress:**
 - 🔄 DRAM BW optimization: 23.76% → 60-80% target (Flash Attention 3 achieves >80%)
@@ -240,6 +240,69 @@ RoboCache **does** have:
 **What's TRUE:**
 - Phase 2 (multimodal) and Phase 3 (voxelization) APIs not yet exposed
 - Only low-level CUDA kernels exist for those
+
+---
+
+## GPU Utilization Measurement Caveats
+
+### End-to-End Pipeline: 92-95% GPU Utilization*
+
+**\*IMPORTANT CAVEATS - Read Before Citing This Number:**
+
+**What We Actually Measured:**
+- **Workload:** Diffusion Transformer (300M params) training loop
+- **Data Generation:** GPU-side random data (NOT realistic dataloader)
+- **Batch Size:** 128 (large, to saturate GPU)
+- **Measurement:** `nvidia-smi dmon` filtered for steady-state (no startup artifacts)
+- **Hardware:** Single H100 GPU
+- **Result:** 92-95% average GPU utilization in steady state
+
+**Why This Is NOT Representative of Production:**
+
+1. **GPU-Side Data Generation** (Unrealistic)
+   - Real dataloaders involve CPU→GPU transfer (PCIe bottleneck)
+   - Real preprocessing happens on CPU (slow)
+   - Disk I/O, decompression, augmentation add latency
+   - **Production estimate:** 70-85% utilization with real dataloader
+
+2. **Synthetic Workload** (Overly Favorable)
+   - No actual robot dataset (RT-X, CALVIN, RoboMimic)
+   - No multimodal fusion in the loop (vision + proprio + force)
+   - No point cloud voxelization
+   - **Production estimate:** 60-75% with full preprocessing pipeline
+
+3. **Large Batch Size** (Memory-Intensive)
+   - Batch=128 saturates GPU memory
+   - Real training may need smaller batches (OOM, convergence)
+   - Gradient accumulation adds overhead
+   - **Production estimate:** 50-70% with realistic batch sizes
+
+4. **Single-GPU** (No Distribution Overhead)
+   - Multi-GPU adds NCCL communication
+   - Gradient synchronization reduces utilization
+   - **Production estimate:** 40-60% per GPU in multi-GPU setup
+
+**Honest Production Estimate:**
+- **Best case (optimized dataloader):** 70-85% GPU utilization
+- **Typical case (standard dataloader):** 50-70% GPU utilization
+- **Worst case (naive dataloader):** 30-50% GPU utilization
+
+**What This Measurement DOES Prove:**
+- ✅ RoboCache kernels don't bottleneck the GPU (when data is available)
+- ✅ Kernel launch overhead is negligible
+- ✅ No CUDA stream synchronization issues
+- ✅ Memory transfers are async and overlapped
+
+**What This Measurement DOES NOT Prove:**
+- ❌ Real dataloader performance (CPU→GPU pipeline)
+- ❌ Multi-GPU scaling efficiency
+- ❌ End-to-end training throughput on real datasets
+- ❌ Comparison to baseline (PyTorch, Triton, etc.)
+
+**Expert Recommendation:**
+- **Use this number:** "RoboCache achieves 92-95% GPU utilization in synthetic benchmarks with GPU-side data generation, indicating negligible kernel overhead."
+- **Don't use this number:** "RoboCache achieves 95%+ GPU utilization in production." (False claim)
+- **Better claim:** "RoboCache eliminates GPU idle time when data is available, with measured utilization of 92-95% in controlled benchmarks. Real-world utilization depends on dataloader performance."
 
 ---
 
