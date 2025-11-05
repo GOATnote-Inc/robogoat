@@ -114,11 +114,10 @@ fused_multimodal_alignment_kernel(
                 Element* v_out = output + out_offset * (vision_dim + proprio_dim + force_dim);
                 
                 for (int d = 0; d < vision_dim; d++) {
-                    float val_left = static_cast<float>(v_left_data[d]);
-                    float val_right = static_cast<float>(v_right_data[d]);
-                    v_out[d] = static_cast<Element>(
-                        fmaf(v_weight, val_right - val_left, val_left)
-                    );
+                    float val_left = (sizeof(Element) == 2) ? __bfloat162float(reinterpret_cast<const __nv_bfloat16&>(v_left_data[d])) : static_cast<float>(v_left_data[d]);
+                    float val_right = (sizeof(Element) == 2) ? __bfloat162float(reinterpret_cast<const __nv_bfloat16&>(v_right_data[d])) : static_cast<float>(v_right_data[d]);
+                    float result = fmaf(v_weight, val_right - val_left, val_left);
+                    v_out[d] = (sizeof(Element) == 2) ? reinterpret_cast<Element&>(__float2bfloat16(result)) : static_cast<Element>(result);
                 }
             }
             
@@ -145,11 +144,10 @@ fused_multimodal_alignment_kernel(
                     out_offset * (vision_dim + proprio_dim + force_dim) + vision_dim;
                 
                 for (int d = 0; d < proprio_dim; d++) {
-                    float val_left = static_cast<float>(p_left_data[d]);
-                    float val_right = static_cast<float>(p_right_data[d]);
-                    p_out[d] = static_cast<Element>(
-                        fmaf(p_weight, val_right - val_left, val_left)
-                    );
+                    float val_left = (sizeof(Element) == 2) ? __bfloat162float(reinterpret_cast<const __nv_bfloat16&>(p_left_data[d])) : static_cast<float>(p_left_data[d]);
+                    float val_right = (sizeof(Element) == 2) ? __bfloat162float(reinterpret_cast<const __nv_bfloat16&>(p_right_data[d])) : static_cast<float>(p_right_data[d]);
+                    float result = fmaf(p_weight, val_right - val_left, val_left);
+                    p_out[d] = (sizeof(Element) == 2) ? reinterpret_cast<Element&>(__float2bfloat16(result)) : static_cast<Element>(result);
                 }
             }
             
@@ -177,11 +175,10 @@ fused_multimodal_alignment_kernel(
                     vision_dim + proprio_dim;
                 
                 for (int d = 0; d < force_dim; d++) {
-                    float val_left = static_cast<float>(f_left_data[d]);
-                    float val_right = static_cast<float>(f_right_data[d]);
-                    f_out[d] = static_cast<Element>(
-                        fmaf(f_weight, val_right - val_left, val_left)
-                    );
+                    float val_left = (sizeof(Element) == 2) ? __bfloat162float(reinterpret_cast<const __nv_bfloat16&>(f_left_data[d])) : static_cast<float>(f_left_data[d]);
+                    float val_right = (sizeof(Element) == 2) ? __bfloat162float(reinterpret_cast<const __nv_bfloat16&>(f_right_data[d])) : static_cast<float>(f_right_data[d]);
+                    float result = fmaf(f_weight, val_right - val_left, val_left);
+                    f_out[d] = (sizeof(Element) == 2) ? reinterpret_cast<Element&>(__float2bfloat16(result)) : static_cast<Element>(result);
                 }
             }
         }

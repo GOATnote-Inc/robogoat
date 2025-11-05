@@ -37,7 +37,7 @@ torch::Tensor resample_trajectories_hopper(
                                   .dtype(torch::kBFloat16)
                                   .device(source_data.device()));
     
-    cudaStream_t stream = 0;  // Default stream
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream(source_data.device().index());
     
     cudaError_t err = launch_trajectory_resample_hopper(
         source_data.data_ptr(),
