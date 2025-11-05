@@ -146,18 +146,4 @@ torch::Tensor fused_multimodal_alignment_torch(
 
 } // namespace bindings
 } // namespace robocache
-
-// Pybind11 module
-PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
-    m.def("fused_multimodal_alignment", 
-          &robocache::bindings::fused_multimodal_alignment_torch,
-          "Fused multimodal sensor alignment (CUDA)",
-          py::arg("vision_data"),
-          py::arg("vision_times"),
-          py::arg("proprio_data"),
-          py::arg("proprio_times"),
-          py::arg("force_data") = py::none(),
-          py::arg("force_times") = py::none(),
-          py::arg("target_times"));
-}
-
+// Note: PYBIND11_MODULE removed - now defined in robocache_bindings_all.cu

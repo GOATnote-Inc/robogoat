@@ -49,12 +49,15 @@ try:
     # Get kernel directory
     kernel_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'kernels', 'cutlass')
     
-    # Build optimized kernel with shared memory + vectorization
+    # Build ALL CUDA kernels: trajectory resampling, multimodal fusion, voxelization
+    # Uses unified bindings to avoid PYBIND11_MODULE conflicts
     robocache_cuda = load(
-        name='robocache_cuda_optimized',
+        name='robocache_cuda_all',
         sources=[
             os.path.join(kernel_dir, 'trajectory_resample_optimized_v2.cu'),
-            os.path.join(kernel_dir, 'trajectory_resample_optimized_v2_torch.cu'),
+            os.path.join(kernel_dir, 'multimodal_fusion.cu'),
+            os.path.join(kernel_dir, 'point_cloud_voxelization.cu'),
+            os.path.join(kernel_dir, 'robocache_bindings_all.cu'),  # Unified PyBind11 bindings
         ],
         extra_cuda_cflags=[
             '-O3',
@@ -62,8 +65,10 @@ try:
             '-lineinfo',
             '--expt-relaxed-constexpr',
             '-std=c++17',
+            '-gencode=arch=compute_90,code=sm_90',  # H100 (Hopper)
+            '-gencode=arch=compute_80,code=sm_80',  # A100 (Ampere)
         ],
-        verbose=True
+        verbose=False  # Set to True for debugging
     )
     _CUDA_AVAILABLE = True
 except Exception as e:

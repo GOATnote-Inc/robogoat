@@ -312,32 +312,5 @@ std::tuple<torch::Tensor, torch::Tensor> compute_point_cloud_bounds_torch(
 // Python Module Definition
 //==============================================================================
 
-PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
-    m.def("voxelize_occupancy", &robocache::kernels::voxelize_occupancy_torch,
-          "Occupancy voxelization (CUDA)",
-          py::arg("points"), py::arg("grid_size"), py::arg("voxel_size"), py::arg("origin"));
-    
-    m.def("voxelize_density", &robocache::kernels::voxelize_density_torch,
-          "Density voxelization (CUDA)",
-          py::arg("points"), py::arg("grid_size"), py::arg("voxel_size"), py::arg("origin"));
-    
-    m.def("voxelize_feature_max", &robocache::kernels::voxelize_feature_max_torch,
-          "Feature max pooling voxelization (CUDA)",
-          py::arg("points"), py::arg("features"), py::arg("grid_size"),
-          py::arg("voxel_size"), py::arg("origin"));
-    
-    m.def("voxelize_feature_mean", &robocache::kernels::voxelize_feature_mean_torch,
-          "Feature mean pooling voxelization (CUDA)",
-          py::arg("points"), py::arg("features"), py::arg("grid_size"),
-          py::arg("voxel_size"), py::arg("origin"));
-    
-    m.def("voxelize_tsdf", &robocache::kernels::voxelize_tsdf_torch,
-          "TSDF voxelization (CUDA)",
-          py::arg("points"), py::arg("normals"), py::arg("grid_size"),
-          py::arg("voxel_size"), py::arg("origin"), py::arg("truncation_distance"));
-    
-    m.def("compute_point_cloud_bounds", &robocache::kernels::compute_point_cloud_bounds_torch,
-          "Compute point cloud bounding box (CUDA)",
-          py::arg("points"));
-}
 
+// Note: PYBIND11_MODULE removed - now defined in robocache_bindings_all.cu
