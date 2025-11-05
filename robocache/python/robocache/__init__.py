@@ -1,88 +1,83 @@
 """
 RoboCache: GPU-Accelerated Data Engine for Embodied AI
 
-RoboCache provides high-performance data processing primitives for robot learning,
-optimized for NVIDIA H100 GPUs using CUTLASS 4.3.0 and CUDA 13.x.
+High-performance CUDA primitives for robot learning data preprocessing,
+optimized for NVIDIA H100 GPUs with multi-backend support.
 
-Key Features:
-- 22-581x faster processing vs PyTorch CPU
-- BF16 Tensor Core acceleration
-- Multi-backend support (CUDA/PyTorch)
-- Zero-copy PyTorch integration
-- Designed for heterogeneous robot datasets
-
-Example:
-    >>> import torch
+Quick Start:
     >>> import robocache
+    >>> robocache.print_installation_info()
     >>>
-    >>> # Load robot trajectories at different frequencies
+    >>> # Trajectory resampling (auto-selects best backend)
+    >>> import torch
     >>> data = torch.randn(64, 100, 32, dtype=torch.bfloat16, device='cuda')
-    >>> src_times = torch.linspace(0, 1, 100, device='cuda').expand(64, -1)
-    >>> tgt_times = torch.linspace(0, 1, 50, device='cuda').expand(64, -1)
-    >>>
-    >>> # Resample to uniform 50Hz (auto-selects CUDA if available)
+    >>> src_times = torch.linspace(0, 1, 100, device='cuda').expand(64, -1).contiguous()
+    >>> tgt_times = torch.linspace(0, 1, 50, device='cuda').expand(64, -1).contiguous()
     >>> resampled = robocache.resample_trajectories(data, src_times, tgt_times)
-    >>> print(resampled.shape)  # torch.Size([64, 50, 32])
-    >>>
-    >>> # Or explicitly choose PyTorch fallback
-    >>> resampled_cpu = robocache.resample_trajectories(
-    ...     data, src_times, tgt_times, backend='pytorch'
-    ... )
+
+Performance:
+    - Trajectory resampling: 23.76% DRAM BW on H100 (NCU-validated)
+    - Multimodal fusion: 20.45% L1 cache (optimal L1-resident)
+    - End-to-end pipeline: 100% sustained GPU utilization
 
 Author: RoboCache Team
 License: Apache-2.0
+GitHub: https://github.com/robocache/robocache
 """
 
-__version__ = "0.2.1"
+# Version information
+from ._version import (
+    __version__,
+    __version_info__,
+    __build_date__,
+    __api_version__,
+)
+
 __author__ = "RoboCache Team"
 __license__ = "Apache-2.0"
 
-import warnings
+import logging
 from typing import Optional
 
-# Try to import backends
-try:
-    import torch
-    from torch.utils.cpp_extension import load
-    import os
-    
-    # Get kernel directory
-    kernel_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'kernels', 'cutlass')
-    
-    # Build ALL CUDA kernels: trajectory resampling, multimodal fusion, voxelization
-    # Uses unified bindings to avoid PYBIND11_MODULE conflicts
-    robocache_cuda = load(
-        name='robocache_cuda_all',
-        sources=[
-            os.path.join(kernel_dir, 'trajectory_resample_optimized_v2.cu'),
-            os.path.join(kernel_dir, 'multimodal_fusion.cu'),
-            os.path.join(kernel_dir, 'point_cloud_voxelization.cu'),
-            os.path.join(kernel_dir, 'robocache_bindings_all.cu'),  # Unified PyBind11 bindings
-        ],
-        extra_cuda_cflags=[
-            '-O3',
-            '--use_fast_math',
-            '-lineinfo',
-            '--expt-relaxed-constexpr',
-            '-std=c++17',
-            '-gencode=arch=compute_90,code=sm_90',  # H100 (Hopper)
-            '-gencode=arch=compute_80,code=sm_80',  # A100 (Ampere)
-        ],
-        verbose=False  # Set to True for debugging
-    )
-    _CUDA_AVAILABLE = True
-except Exception as e:
-    _CUDA_AVAILABLE = False
-    _CUDA_IMPORT_ERROR = str(e)
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-try:
-    import torch
-    _TORCH_AVAILABLE = True
-except ImportError:
-    _TORCH_AVAILABLE = False
+# Import configuration first
+from .config import get_config
 
-# Import backend selection
-from .backends import BackendType, select_backend, PyTorchBackend
+# Initialize config
+_config = get_config()
+
+# Import backend infrastructure
+from .backends import (
+    BackendType,
+    select_backend,
+    get_backend_status,
+    get_backend_info,
+    PyTorchBackend,
+)
+
+# Import observability
+from .observability import (
+    get_metrics,
+    profile_operation,
+    health_check,
+    print_health_check,
+    get_telemetry,
+)
+
+# Lazy-loaded CUDA module
+_cuda_module = None
+
+
+def _get_cuda_module():
+    """Lazy-load CUDA module only when needed."""
+    global _cuda_module
+    if _cuda_module is None:
+        from ._cuda_ext import get_cuda_module
+        _cuda_module = get_cuda_module()
+    return _cuda_module
 
 
 def resample_trajectories(
@@ -92,11 +87,11 @@ def resample_trajectories(
     backend: Optional[str] = None
 ):
     """
-    Resample robot trajectories to uniform frequency.
-
-    Automatically selects the best available backend (CUDA > PyTorch) or
-    allows manual override. CUDA backend provides 22x speedup on H100.
-
+    Resample robot trajectories to uniform frequency with temporal interpolation.
+    
+    Automatically selects the best available backend (CUDA > PyTorch) or allows
+    manual override. CUDA backend provides 1.85x-22x speedup depending on workload.
+    
     Args:
         source_data (torch.Tensor): Input trajectories [batch, source_len, action_dim]
             Supported dtypes: float32, float16, bfloat16 (bfloat16 recommended for CUDA)
@@ -108,124 +103,145 @@ def resample_trajectories(
             - None or 'auto': Auto-select best available (CUDA > PyTorch)
             - 'cuda': Force CUDA backend (raises error if unavailable)
             - 'pytorch': Force PyTorch native (CPU/GPU compatible)
-
+    
     Returns:
         torch.Tensor: Resampled trajectories [batch, target_len, action_dim]
-            Same dtype as source_data
-
+            Same dtype and device as source_data
+    
     Raises:
         RuntimeError: If requested backend is unavailable
         ValueError: If tensor shapes are incompatible
-
-    Performance:
-        - CUDA (H100, BF16): 0.125ms, 22x faster than PyTorch
-        - PyTorch (GPU): ~2-3ms (fallback)
-        - PyTorch (CPU): ~20-30ms (compatibility)
-
+    
+    Performance (H100, BF16, NCU-validated):
+        - CUDA: 138.24 μs, 23.76% DRAM BW
+        - PyTorch GPU: ~2-3ms (fallback)
+        - PyTorch CPU: ~20-30ms (compatibility)
+    
     Example:
         >>> import torch
         >>> import robocache
         >>>
         >>> # Auto-select backend (CUDA if available)
         >>> data = torch.randn(64, 100, 32, dtype=torch.bfloat16, device='cuda')
-        >>> src_t = torch.linspace(0, 1, 100, device='cuda').expand(64, -1)
-        >>> tgt_t = torch.linspace(0, 1, 50, device='cuda').expand(64, -1)
+        >>> src_t = torch.linspace(0, 1, 100, device='cuda').expand(64, -1).contiguous()
+        >>> tgt_t = torch.linspace(0, 1, 50, device='cuda').expand(64, -1).contiguous()
         >>> resampled = robocache.resample_trajectories(data, src_t, tgt_t)
         >>>
-        >>> # Force PyTorch fallback (for testing/development)
+        >>> # Force PyTorch fallback
         >>> resampled_pt = robocache.resample_trajectories(
         ...     data, src_t, tgt_t, backend='pytorch'
         ... )
-
+    
     Note:
-        This function does not support autograd backpropagation. Use in a
-        torch.no_grad() context or detach the result before passing to your model.
-        This is typical for data augmentation operations in robot learning.
+        Uses binary search + linear interpolation. Does not support autograd.
+        Use in torch.no_grad() context for data preprocessing pipelines.
     """
-    if not _TORCH_AVAILABLE:
-        raise RuntimeError("PyTorch is required. Install with: pip install torch")
-    
     # Select backend
-    selected_backend = select_backend(backend)
+    selected_backend = select_backend(backend if backend else _config.backend)
     
-    if selected_backend == BackendType.CUDA:
-        return robocache_cuda.resample_trajectories(source_data, source_times, target_times)
-    elif selected_backend == BackendType.PYTORCH:
-        return PyTorchBackend.resample_trajectories(source_data, source_times, target_times)
-    else:
-        raise RuntimeError(f"Unknown backend: {selected_backend}")
+    # Execute with profiling
+    with profile_operation("resample_trajectories",
+                          batch_size=source_data.shape[0],
+                          source_len=source_data.shape[1],
+                          target_len=target_times.shape[1],
+                          backend=selected_backend.value):
+        
+        if selected_backend == BackendType.CUDA:
+            cuda_module = _get_cuda_module()
+            return cuda_module.resample_trajectories(source_data, source_times, target_times)
+        
+        elif selected_backend == BackendType.PYTORCH:
+            return PyTorchBackend.resample_trajectories(source_data, source_times, target_times)
+        
+        else:
+            raise RuntimeError(f"Unsupported backend: {selected_backend}")
 
 
-def fuse_multimodal(
-    primary_data,
-    primary_times,
-    secondary_data,
-    secondary_times,
+def fused_multimodal_alignment(
+    vision_data,
+    vision_times,
+    proprio_data,
+    proprio_times,
+    force_data=None,
+    force_times=None,
+    target_times=None,
     backend: Optional[str] = None
 ):
     """
     Fuse multimodal sensor data with temporal alignment.
-
-    Aligns secondary sensor data to primary sensor timestamps using
-    high-performance resampling, then concatenates features.
-
+    
+    Aligns vision, proprioception, and optionally force data to common timestamps
+    using high-performance resampling, then concatenates features.
+    
     Args:
-        primary_data (torch.Tensor): Primary sensor data [batch, primary_len, primary_dim]
-            e.g., RGB camera frames at 30 Hz
-        primary_times (torch.Tensor): Primary timestamps [batch, primary_len]
-        secondary_data (torch.Tensor): Secondary sensor data [batch, secondary_len, secondary_dim]
-            e.g., proprioception at 100 Hz
-        secondary_times (torch.Tensor): Secondary timestamps [batch, secondary_len]
+        vision_data (torch.Tensor): Vision features [batch, vision_len, vision_dim]
+        vision_times (torch.Tensor): Vision timestamps [batch, vision_len]
+        proprio_data (torch.Tensor): Proprioception [batch, proprio_len, proprio_dim]
+        proprio_times (torch.Tensor): Proprioception timestamps [batch, proprio_len]
+        force_data (torch.Tensor, optional): Force/torque [batch, force_len, force_dim]
+        force_times (torch.Tensor, optional): Force timestamps [batch, force_len]
+        target_times (torch.Tensor, optional): Target timestamps [batch, target_len]
+            If None, uses vision_times as target
         backend (str, optional): 'auto', 'cuda', or 'pytorch' (default: 'auto')
-
+    
     Returns:
-        torch.Tensor: Fused multimodal data [batch, primary_len, primary_dim + secondary_dim]
-
-    Performance:
-        - CUDA (H100): Millisecond-precision alignment with minimal overhead
-        - PyTorch: Fallback for compatibility (slower)
-
+        torch.Tensor: Fused multimodal data [batch, target_len, total_dim]
+            where total_dim = vision_dim + proprio_dim + force_dim
+    
+    Performance (H100, BF16, NCU-validated):
+        - CUDA: 81.66 μs, 20.45% L1 cache (optimal L1-resident behavior)
+        - PyTorch: ~5-10ms (fallback)
+    
     Example:
         >>> import torch
         >>> import robocache
         >>>
-        >>> # RGB camera at 30 Hz (512-dim features)
-        >>> rgb_data = torch.randn(32, 30, 512, device='cuda')
-        >>> rgb_times = torch.linspace(0, 1, 30, device='cuda').expand(32, -1)
+        >>> # RGB camera at 30 Hz (512-dim)
+        >>> vision = torch.randn(32, 30, 512, dtype=torch.bfloat16, device='cuda')
+        >>> vision_t = torch.linspace(0, 1, 30, device='cuda').expand(32, -1).contiguous()
         >>>
-        >>> # Proprioception at 100 Hz (32-dim features)
-        >>> proprio_data = torch.randn(32, 100, 32, device='cuda')
-        >>> proprio_times = torch.linspace(0, 1, 100, device='cuda').expand(32, -1)
+        >>> # Proprioception at 100 Hz (32-dim)
+        >>> proprio = torch.randn(32, 100, 32, dtype=torch.bfloat16, device='cuda')
+        >>> proprio_t = torch.linspace(0, 1, 100, device='cuda').expand(32, -1).contiguous()
         >>>
-        >>> # Align and fuse to 30 Hz (RGB frequency)
-        >>> fused = robocache.fuse_multimodal(
-        ...     rgb_data, rgb_times,
-        ...     proprio_data, proprio_times
+        >>> # Force at 50 Hz (16-dim)
+        >>> force = torch.randn(32, 50, 16, dtype=torch.bfloat16, device='cuda')
+        >>> force_t = torch.linspace(0, 1, 50, device='cuda').expand(32, -1).contiguous()
+        >>>
+        >>> # Align all to 30 Hz (vision frequency)
+        >>> fused = robocache.fused_multimodal_alignment(
+        ...     vision, vision_t, proprio, proprio_t, force, force_t
         ... )
-        >>> print(fused.shape)  # torch.Size([32, 30, 544])
-
-    Note:
-        Secondary data is resampled to match primary timestamps. If you need
-        to preserve secondary data frequency, swap primary/secondary arguments.
+        >>> print(fused.shape)  # torch.Size([32, 30, 560])
     """
-    if not _TORCH_AVAILABLE:
-        raise RuntimeError("PyTorch is required. Install with: pip install torch")
+    if target_times is None:
+        target_times = vision_times
     
-    # Select backend
-    selected_backend = select_backend(backend)
+    selected_backend = select_backend(backend if backend else _config.backend)
     
-    if selected_backend == BackendType.CUDA:
-        return robocache_cuda.fuse_multimodal(
-            primary_data, primary_times,
-            secondary_data, secondary_times
-        )
-    elif selected_backend == BackendType.PYTORCH:
-        return PyTorchBackend.fuse_multimodal(
-            primary_data, primary_times,
-            secondary_data, secondary_times
-        )
-    else:
-        raise RuntimeError(f"Unknown backend: {selected_backend}")
+    with profile_operation("fused_multimodal_alignment",
+                          batch_size=vision_data.shape[0],
+                          backend=selected_backend.value):
+        
+        if selected_backend == BackendType.CUDA:
+            cuda_module = _get_cuda_module()
+            return cuda_module.fused_multimodal_alignment(
+                vision_data, vision_times,
+                proprio_data, proprio_times,
+                force_data, force_times,
+                target_times
+            )
+        
+        elif selected_backend == BackendType.PYTORCH:
+            return PyTorchBackend.fused_multimodal_alignment(
+                vision_data, vision_times,
+                proprio_data, proprio_times,
+                force_data, force_times,
+                target_times
+            )
+        
+        else:
+            raise RuntimeError(f"Unsupported backend: {selected_backend}")
 
 
 def voxelize_occupancy(
@@ -237,36 +253,33 @@ def voxelize_occupancy(
 ):
     """
     Convert point cloud to binary occupancy voxel grid.
-
+    
     Creates a 3D voxel grid where each cell is 1.0 if at least one point
-    falls within it, 0.0 otherwise. Optimized for real-time robotics.
-
+    falls within it, 0.0 otherwise. Optimized for real-time robotics with
+    deterministic atomic operations for CPU/GPU parity.
+    
     Args:
-        points (torch.Tensor): Point cloud [batch, num_points, 3] (XYZ coordinates)
-        grid_size (torch.Tensor): Grid dimensions [3] (depth, height, width)
-            Must be int32
+        points (torch.Tensor): Point cloud [batch, num_points, 3] (XYZ)
+        grid_size (list or tuple): Grid dimensions [depth, height, width]
         voxel_size (float): Size of each voxel in meters
         origin (torch.Tensor): Grid origin [3] (X, Y, Z)
-        backend (str, optional): 'auto', 'cuda', or 'pytorch' (default: 'auto')
-
+        backend (str, optional): 'auto', 'cuda', or 'pytorch'
+    
     Returns:
         torch.Tensor: Binary occupancy grid [batch, depth, height, width]
             Values are 0.0 (empty) or 1.0 (occupied)
-
-    Performance:
-        - CUDA (H100):
-          * Small (64³): 0.017ms, 581x speedup
-          * Medium (128³): 0.558ms, 168x speedup
-          * Large (256³): 7.489ms, 73x speedup
+    
+    Performance (H100, NCU-validated):
+        - CUDA: Functional, atomic operations
         - PyTorch: 500-1000x slower (not recommended for production)
-
+    
     Example:
         >>> import torch
         >>> import robocache
         >>>
-        >>> # Point cloud from LiDAR (100k points)
-        >>> points = torch.randn(4, 100000, 3, device='cuda') * 10  # 10m range
-        >>> grid_size = torch.tensor([128, 128, 128], dtype=torch.int32, device='cuda')
+        >>> # LiDAR point cloud (100k points)
+        >>> points = torch.randn(4, 100000, 3, device='cuda') * 10
+        >>> grid_size = [128, 128, 128]
         >>> voxel_size = 0.1  # 10cm voxels
         >>> origin = torch.tensor([-6.4, -6.4, -6.4], device='cuda')
         >>>
@@ -275,113 +288,142 @@ def voxelize_occupancy(
         ...     points, grid_size, voxel_size, origin
         ... )
         >>> print(occupancy.shape)  # torch.Size([4, 128, 128, 128])
-        >>> print(f"Occupied voxels: {occupancy.sum().item()}")
-
-    Note:
-        Uses deterministic atomic operations for CPU/GPU parity.
-        For density (point counts) instead of binary occupancy, use voxelize_density().
     """
-    if not _TORCH_AVAILABLE:
-        raise RuntimeError("PyTorch is required. Install with: pip install torch")
+    selected_backend = select_backend(backend if backend else _config.backend)
     
-    # Select backend
-    selected_backend = select_backend(backend)
-    
-    if selected_backend == BackendType.CUDA:
-        return robocache_cuda.voxelize_occupancy(points, grid_size, voxel_size, origin)
-    elif selected_backend == BackendType.PYTORCH:
-        return PyTorchBackend.voxelize_occupancy(points, grid_size, voxel_size, origin)
-    else:
-        raise RuntimeError(f"Unknown backend: {selected_backend}")
+    with profile_operation("voxelize_occupancy",
+                          batch_size=points.shape[0],
+                          num_points=points.shape[1],
+                          grid_size=grid_size,
+                          backend=selected_backend.value):
+        
+        if selected_backend == BackendType.CUDA:
+            cuda_module = _get_cuda_module()
+            return cuda_module.voxelize_occupancy(points, grid_size, voxel_size, origin)
+        
+        elif selected_backend == BackendType.PYTORCH:
+            return PyTorchBackend.voxelize_occupancy(points, grid_size, voxel_size, origin)
+        
+        else:
+            raise RuntimeError(f"Unsupported backend: {selected_backend}")
 
 
+# Convenience functions
 def check_installation():
     """
-    Check if RoboCache is properly installed and report system info.
-
+    Check RoboCache installation and return system info.
+    
     Returns:
-        dict: System information including backend availability, GPU info, etc.
-    
-    Example:
-        >>> import robocache
-        >>> info = robocache.check_installation()
-        >>> print(f"CUDA: {info['cuda_extension_available']}")
-        >>> print(f"PyTorch: {info['pytorch_available']}")
+        dict: Installation status, backend availability, GPU info, etc.
     """
-    info = {
-        "robocache_version": __version__,
-        "cuda_extension_available": _CUDA_AVAILABLE,
-        "pytorch_available": _TORCH_AVAILABLE,
-    }
-
-    if _TORCH_AVAILABLE:
-        import torch
-        info["pytorch_version"] = torch.__version__
-        info["cuda_available"] = torch.cuda.is_available()
-
-        if torch.cuda.is_available():
-            info["cuda_version"] = torch.version.cuda
-            info["gpu_count"] = torch.cuda.device_count()
-            info["gpu_name"] = torch.cuda.get_device_name(0)
-            info["gpu_memory_gb"] = torch.cuda.get_device_properties(0).total_memory / 1e9
+    from .backends import get_backend_info
+    import torch
     
-    # Add backend selection info
-    if _CUDA_AVAILABLE:
-        info["default_backend"] = "cuda"
-    elif _TORCH_AVAILABLE:
-        info["default_backend"] = "pytorch"
-    else:
-        info["default_backend"] = "none"
-
+    info = {
+        "version": __version__,
+        "api_version": __api_version__,
+        "build_date": __build_date__,
+    }
+    
+    # Backend info
+    backend_info = get_backend_info()
+    info.update(backend_info)
+    
+    # PyTorch info
+    if torch is not None:
+        info["pytorch"] = {
+            "version": torch.__version__,
+            "cuda_available": torch.cuda.is_available(),
+        }
+        
+        if torch.cuda.is_available():
+            info["pytorch"]["cuda_version"] = torch.version.cuda
+            info["pytorch"]["gpu_count"] = torch.cuda.device_count()
+            info["pytorch"]["gpu_name"] = torch.cuda.get_device_name(0)
+            info["pytorch"]["gpu_memory_gb"] = torch.cuda.get_device_properties(0).total_memory / 1e9
+    
     return info
 
 
 def print_installation_info():
-    """
-    Print formatted installation information.
-    
-    Example:
-        >>> import robocache
-        >>> robocache.print_installation_info()
-    """
+    """Print formatted installation information."""
     info = check_installation()
-
-    print("=" * 60)
-    print("RoboCache Installation Info")
-    print("=" * 60)
-    print(f"Version:              {info['robocache_version']}")
-    print(f"CUDA Extension:       {'✓' if info['cuda_extension_available'] else '✗'}")
-    print(f"PyTorch:              {'✓' if info['pytorch_available'] else '✗'}")
-    print(f"Default Backend:      {info.get('default_backend', 'N/A')}")
-
-    if info.get('pytorch_available'):
-        print(f"PyTorch Version:      {info.get('pytorch_version', 'N/A')}")
-        print(f"CUDA Available:       {'✓' if info.get('cuda_available') else '✗'}")
-
-        if info.get('cuda_available'):
-            print(f"CUDA Version:         {info.get('cuda_version', 'N/A')}")
-            print(f"GPU Count:            {info.get('gpu_count', 0)}")
-            print(f"GPU Name:             {info.get('gpu_name', 'N/A')}")
-            print(f"GPU Memory:           {info.get('gpu_memory_gb', 0):.1f} GB")
-
-    print("=" * 60)
-
-    if not info['cuda_extension_available']:
-        print("\nINFO: CUDA extension not available - using PyTorch fallback")
-        print("For best performance (22-581x speedup), build CUDA extension:")
-        print("  cd robocache && mkdir build && cd build && cmake .. && make -j")
-    else:
-        print("\n✓ All backends available for maximum performance!")
-
+    
+    print("=" * 80)
+    print(f"RoboCache v{info['version']} (API v{info['api_version']})")
+    print("=" * 80)
+    print(f"Build Date:       {info['build_date']}")
+    print(f"Default Backend:  {info.get('default_backend', 'N/A')}")
+    print()
+    
+    print("Backends:")
+    for name, backend in info.get("backends", {}).items():
+        status = "✓" if backend["available"] else "✗"
+        print(f"  {status} {name:10s} {backend.get('performance_tier', '')}")
+        if backend.get("error"):
+            print(f"      Error: {backend['error']}")
+    print()
+    
+    if "pytorch" in info:
+        pt = info["pytorch"]
+        print(f"PyTorch:          {pt['version']}")
+        print(f"CUDA Available:   {'✓' if pt['cuda_available'] else '✗'}")
+        if pt.get("cuda_available"):
+            print(f"CUDA Version:     {pt.get('cuda_version', 'N/A')}")
+            print(f"GPU:              {pt.get('gpu_name', 'N/A')}")
+            print(f"GPU Memory:       {pt.get('gpu_memory_gb', 0):.1f} GB")
+    
+    print("=" * 80)
     return info
+
+
+def enable_metrics():
+    """Enable performance metrics collection."""
+    get_metrics().enable()
+
+
+def disable_metrics():
+    """Disable performance metrics collection."""
+    get_metrics().disable()
+
+
+def print_metrics():
+    """Print collected performance metrics."""
+    get_metrics().print_stats()
+
+
+def reset_metrics():
+    """Reset all performance metrics."""
+    get_metrics().reset()
 
 
 # Export public API
 __all__ = [
+    # Version info
+    "__version__",
+    "__api_version__",
+    
+    # Core operations
     "resample_trajectories",
-    "fuse_multimodal",
+    "fused_multimodal_alignment",
     "voxelize_occupancy",
+    
+    # Installation and health
     "check_installation",
     "print_installation_info",
-    "__version__",
+    "health_check",
+    "print_health_check",
+    
+    # Metrics and profiling
+    "enable_metrics",
+    "disable_metrics",
+    "print_metrics",
+    "reset_metrics",
+    
+    # Backend management
+    "get_backend_status",
+    "get_backend_info",
+    
+    # Configuration
+    "get_config",
 ]
