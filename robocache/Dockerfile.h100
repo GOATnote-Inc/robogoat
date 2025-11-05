@@ -1,0 +1,35 @@
+# Reproducible H100 Benchmark Environment for RoboCache
+# Pins all dependencies for bit-reproducible validation
+
+FROM nvidia/cuda:13.0-devel-ubuntu22.04
+
+# Pin system packages
+RUN apt-get update && apt-get install -y \
+    python3.10=3.10.12-1~22.04.5 \
+    python3-pip=22.0.2+dfsg-1ubuntu0.4 \
+    git=1:2.34.1-1ubuntu1.11 \
+    wget=1.21.2-2ubuntu1.1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Pin Python packages
+COPY requirements_h100.txt /tmp/
+RUN pip3 install --no-cache-dir -r /tmp/requirements_h100.txt
+
+# Set working directory
+WORKDIR /workspace/robocache
+
+# Copy source code
+COPY . .
+
+# Set environment variables
+ENV PATH=/usr/local/cuda-13.0/bin:$PATH
+ENV LD_LIBRARY_PATH=/usr/local/cuda-13.0/lib64:$LD_LIBRARY_PATH
+ENV CUDA_HOME=/usr/local/cuda-13.0
+
+# Verify installation
+RUN python3 -c "import torch; print(f'PyTorch: {torch.__version__}'); print(f'CUDA: {torch.version.cuda}')"
+RUN nvcc --version
+
+# Default command runs CI pipeline
+CMD ["bash", "scripts/ci_build_and_test.sh"]
+
