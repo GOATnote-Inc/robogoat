@@ -1,7 +1,8 @@
 # RoboCache: Project Status & Value Proposition
 
-**Last Updated:** November 2025  
-**Status:** Production-ready trajectory resampling, ready for Phase 2 expansion
+**Last Updated:** November 5, 2025  
+**Version:** 0.2.0  
+**Status:** Production-ready with Phase 1-3 core operations, expert-level documentation
 
 ---
 
@@ -9,61 +10,100 @@
 
 **What:** GPU-accelerated data processing engine for robot foundation models  
 **Why:** Eliminate data preprocessing as bottleneck in training  
-**Status:** Phase 1 complete (trajectory resampling), 5.4x speedup validated on H100  
-**Next:** Multimodal fusion, point cloud processing (Q1-Q2 2025)
+**Status:** Phase 1-3 kernels complete (trajectory, multimodal, voxelization), 22-581x speedup on H100  
+**API Status:** Phase 1 fully exposed, Phase 2-3 require low-level import (see KNOWN_LIMITATIONS.md)  
+**Next:** API refinement (v0.2.1), multi-backend support (v0.3.0)
 
 ---
 
-## Current Capabilities
+## Current Capabilities (v0.2.0)
 
-### Trajectory Resampling (Production-Ready)
+### Phase 1: Trajectory Resampling ✅ (Public API)
 
 **Problem solved:** Converting variable-frequency robot data to uniform sampling rate
 
 **Performance (H100):**
-- CUDA BF16: 0.043ms, 10.2% HBM3 efficiency
-- 3.08x faster than baseline
-- NCU validated: 0.63% DRAM, 59.5% L1 cache
+- 0.125ms latency (1024 targets, 4096 sources)
+- 22x faster than PyTorch native
+- NCU validated: Memory-bound (0.2 FLOP/byte)
 
-**Status:** ✅ Production-ready, H100 validated, documented
+**Status:** ✅ Production-ready, fully exposed in `robocache` API
 
 **Key value:**
-- Hand-optimized CUDA for maximum performance
-- Multi-backend architecture (CUDA + PyTorch fallback)
-- Comprehensive benchmarking and profiling
-- Easy PyTorch integration
+- Hand-optimized CUDA BF16 kernels
+- Zero CPU/GPU mismatches (100% deterministic)
+- Comprehensive error handling
+- 108 test cases covering edge cases
+
+### Phase 2: Multimodal Fusion ⚠️ (Low-Level Only)
+
+**Problem solved:** Temporal alignment of multiple sensor streams
+
+**Performance (H100):**
+- Sensor alignment at millisecond precision
+- Efficient temporal matching
+
+**Status:** ⚠️ Kernels implemented, NOT in public API (see KNOWN_LIMITATIONS.md)
+
+**Access:** Requires direct import of `robocache_cuda` module
+
+### Phase 3: Point Cloud Voxelization ✅ (Low-Level)
+
+**Problem solved:** Convert point clouds to 3D voxel grids
+
+**Performance (H100):**
+- Small (64³): 0.017ms, 581x speedup vs CPU
+- Medium (128³): 0.558ms, 168x speedup
+- Large (256³): 7.489ms, 73x speedup
+
+**Status:** ✅ Production-ready kernels, ⚠️ NOT in public API
+
+**Features:**
+- 5 voxelization modes (occupancy, density, TSDF, feature max/mean)
+- Deterministic atomics (CPU/GPU parity)
+- NCU profiled (666 GB/s HBM, 85-90% SM utilization)
 
 ---
 
 ## Technical Architecture
 
-### Multi-Backend Design
+### Current Backend (v0.2.0)
+
+**Reality:** CUDA-only (Hopper H100 optimized)
 
 ```
-User API (PyTorch Integration)
+User API (robocache.*)
        ↓
-Backend Selection (auto or manual)
+PyTorch Integration
        ↓
-┌──────────────┬────────────────┐
-│ CUDA (BF16)  │ PyTorch        │
-│ (production) │ (compatibility)│
-└──────────────┴────────────────┘
+CUDA Extension (robocache_cuda)
+       ↓
+H100-optimized CUDA/CUTLASS kernels
 ```
 
-**Benefits:**
-- Performance: Hand-optimized CUDA for maximum speed (3.08x)
-- Reliability: Production-tested, NCU profiled
-- Flexibility: PyTorch fallback for compatibility
-- Extensible: Can add backends for specific operations
+**Limitations:**
+- ❌ No automatic PyTorch fallback (hard requirement for CUDA)
+- ❌ No Triton backend (roadmapped for v0.4.0)
+- ❌ No backend selection (single implementation)
 
-### Quality Standards
+**See:** [KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md) for workarounds
 
-Every operation includes:
-- ✅ Comprehensive benchmarks vs CPU baseline
-- ✅ Correctness validation
-- ✅ Multiple backend implementations
-- ✅ H100 validation with NCU profiling
-- ✅ Production-ready PyTorch integration
+### Quality Standards (Actual vs Claimed)
+
+✅ **Delivered:**
+- Comprehensive benchmarks vs CPU baseline (NCU, nvidia-smi)
+- Correctness validation (CPU reference, zero tolerance)
+- H100 validation with NCU profiling
+- Production-grade error handling and docs
+
+⚠️ **Partially Delivered:**
+- PyTorch integration (Phase 1 only, Phase 2-3 need wrappers)
+
+❌ **Not Delivered (v0.2.0):**
+- Multiple backend implementations (CUDA only)
+- Automatic fallback to PyTorch
+
+**Honest Assessment:** We excel at CUDA optimization but overpromised on multi-backend
 
 ---
 
@@ -114,39 +154,69 @@ Every operation includes:
 
 ---
 
-## Roadmap Overview
+## Roadmap Overview (Honest Assessment)
 
-### Phase 1: Foundation ✅ (Complete)
+### v0.2.0 (November 2025) ✅ SHIPPED
 
-**Delivered:**
-- Trajectory resampling (5.4x speedup)
-- Multi-backend architecture
-- Comprehensive benchmarking framework
-- H100 validation
+**Delivered Kernels:**
+- Phase 1: Trajectory resampling (22x speedup, public API)
+- Phase 2: Multimodal fusion (low-level only)
+- Phase 3: Point cloud voxelization (581x speedup, low-level only)
+- Comprehensive documentation (16,000+ lines)
+- Production infrastructure (error handling, multi-GPU, memory management)
+- Expert-level analysis (NCU, roofline, ablations, Hopper architecture)
 
-**Timeline:** 2 weeks  
-**Status:** Production-ready
+**What Works:**
+- ✅ CUDA kernels (all phases)
+- ✅ Phase 1 public API
+- ✅ H100 validation
+- ✅ Security & governance
+- ✅ Comprehensive testing (Phase 1)
 
-### Phase 2: Core Operations 🎯 (Next)
+**Known Gaps (see KNOWN_LIMITATIONS.md):**
+- ❌ No multi-backend (CUDA only)
+- ❌ Phase 2-3 not in public API
+- ❌ Limited test coverage for Phase 2-3
+
+### v0.2.1 (December 2025) 🎯 PLANNED
+
+**Focus:** API refinement for Phase 2-3
 
 **Targets:**
-- Multimodal sensor fusion
-- Point cloud processing
-- Temporal alignment
+- Expose `robocache.fuse_multimodal()` in public API
+- Expose `robocache.voxelize_*()` family in public API
+- Add Phase 2-3 regression tests
+- Comprehensive examples for all operations
+- Fix documented gaps
 
-**Timeline:** Q1-Q2 2025 (3-4 months)  
-**Impact:** 10-20x speedup on critical operations
+**Timeline:** 2-3 weeks  
+**Priority:** High (closes audit gaps)
 
-### Phase 3: Full Pipeline 🚀 (Future)
+### v0.3.0 (Q1 2026) 🚀 ROADMAP
 
-**Vision:**
-- End-to-end GPU-resident data pipeline
-- Zero-copy heterogeneous dataset support
-- Real-time augmentation
-- Multi-GPU parallelism
+**Focus:** Multi-backend support
 
-**Timeline:** Q3-Q4 2025  
-**Impact:** 95%+ GPU utilization during training
+**Targets:**
+- PyTorch CPU fallback for development/testing
+- Backend selection API (`backend='pytorch'`)
+- Graceful degradation when CUDA unavailable
+- Performance warnings for non-CUDA backends
+
+**Timeline:** 1-2 months  
+**Priority:** Medium (nice-to-have, not critical)
+
+### v0.4.0 (Q2 2026) 💡 EXPLORATORY
+
+**Focus:** Advanced features
+
+**Possible Targets:**
+- Triton backend evaluation (if beneficial)
+- Windows support (if community demand)
+- Phase 4: Action space conversion (FK/IK with WGMMA)
+- Phase 5: Learned voxelization (attention-based)
+
+**Timeline:** TBD (depends on user feedback)  
+**Priority:** Low (research/exploration)
 
 ---
 
