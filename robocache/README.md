@@ -58,7 +58,7 @@ Convert variable-frequency robot trajectories to uniform sampling rate using GPU
 
 **Measured on:** H100 PCIe, CUDA 13.0, Driver 580.95.05, PyTorch 2.10.0.dev  
 **Optimizations:** Shared memory timestamp caching (16KB), vectorized BF16 processing (float4), cooperative loading, binary search on shared memory  
-**NCU Metrics:** DRAM BW 1.59%, SM Util 56.55%
+**NCU Metrics:** DRAM BW 23.76%, SM Util 9.56%, Memory-latency bound (target: 60-80% BW like Flash Attention 3)
 
 **API:**
 ```python
