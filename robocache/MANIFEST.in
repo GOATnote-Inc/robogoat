@@ -1,0 +1,50 @@
+# MANIFEST.in - Include non-Python files in source distribution
+
+# Documentation
+include README.md
+include LICENSE
+include CHANGELOG.md
+include CITATION.cff
+include CODE_OF_CONDUCT.md
+include CONTRIBUTING.md
+include SECURITY.md
+
+# Configuration files
+include pyproject.toml
+include setup.py
+include pytest.ini
+
+# CUDA kernels (required for building from source)
+recursive-include kernels/cutlass *.cu
+recursive-include kernels/cutlass *.cuh
+recursive-include kernels/cutlass *.h
+recursive-include kernels/cutlass *.hpp
+
+# CMake build system
+include CMakeLists.txt
+recursive-include cmake *.cmake
+
+# Documentation
+recursive-include docs *.md
+recursive-include docs *.rst
+recursive-include docs/profiling *.md
+
+# Tests (for validation)
+recursive-include tests *.py
+
+# Exclude build artifacts
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude __pycache__
+global-exclude .DS_Store
+global-exclude *.so
+global-exclude *.o
+global-exclude *.a
+
+# Exclude generated files
+prune build
+prune dist
+prune *.egg-info
+prune .pytest_cache
+prune htmlcov
+

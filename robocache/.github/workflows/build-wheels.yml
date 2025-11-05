@@ -1,0 +1,240 @@
+name: Build Wheels
+
+on:
+  release:
+    types: [published]
+  push:
+    branches: [main]
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish to PyPI'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  # ============================================================================
+  # Build Pure Python Wheel (PyTorch backend only, no CUDA)
+  # ============================================================================
+  build-pure-wheel:
+    name: Build Pure Python Wheel
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine wheel setuptools
+      
+      - name: Build wheel
+        run: |
+          cd robocache
+          python -m build --wheel
+      
+      - name: Check wheel
+        run: |
+          cd robocache
+          twine check dist/*
+          unzip -l dist/*.whl
+      
+      - name: Upload wheel
+        uses: actions/upload-artifact@v3
+        with:
+          name: pure-python-wheel
+          path: robocache/dist/*.whl
+
+  # ============================================================================
+  # Build manylinux Wheels with CUDA Support
+  # ============================================================================
+  build-manylinux-cuda-wheels:
+    name: Build manylinux CUDA Wheels
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.8', '3.9', '3.10', '3.11']
+        cuda-version: ['11.8', '12.1']
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker for manylinux
+        run: |
+          docker pull quay.io/pypa/manylinux2014_x86_64
+      
+      - name: Build wheel in manylinux container
+        run: |
+          docker run --rm \
+            -v $(pwd):/workspace \
+            -e PYTHON_VERSION=${{ matrix.python-version }} \
+            -e CUDA_VERSION=${{ matrix.cuda-version }} \
+            quay.io/pypa/manylinux2014_x86_64 \
+            /bin/bash -c "
+              set -e
+              
+              # Install CUDA toolkit
+              yum install -y wget
+              if [ '${{ matrix.cuda-version }}' = '11.8' ]; then
+                wget https://developer.download.nvidia.com/compute/cuda/11.8.0/local_installers/cuda_11.8.0_520.61.05_linux.run
+                sh cuda_11.8.0_520.61.05_linux.run --silent --toolkit
+                export PATH=/usr/local/cuda-11.8/bin:\$PATH
+                export LD_LIBRARY_PATH=/usr/local/cuda-11.8/lib64:\$LD_LIBRARY_PATH
+              else
+                wget https://developer.download.nvidia.com/compute/cuda/12.1.0/local_installers/cuda_12.1.0_530.30.02_linux.run
+                sh cuda_12.1.0_530.30.02_linux.run --silent --toolkit
+                export PATH=/usr/local/cuda-12.1/bin:\$PATH
+                export LD_LIBRARY_PATH=/usr/local/cuda-12.1/lib64:\$LD_LIBRARY_PATH
+              fi
+              
+              # Select Python version
+              PYBIN=/opt/python/cp$(echo '${{ matrix.python-version }}' | tr -d '.')-cp$(echo '${{ matrix.python-version }}' | tr -d '.')/bin
+              
+              # Install dependencies
+              \$PYBIN/pip install --upgrade pip setuptools wheel
+              \$PYBIN/pip install torch --index-url https://download.pytorch.org/whl/cu$(echo '${{ matrix.cuda-version }}' | tr -d '.')
+              
+              # Build wheel
+              cd /workspace/robocache
+              \$PYBIN/python setup.py bdist_wheel
+              
+              # Repair wheel (add missing .so dependencies)
+              auditwheel repair dist/*.whl -w dist/
+              rm dist/*-linux_x86_64.whl  # Remove non-manylinux wheel
+            "
+      
+      - name: Upload wheel
+        uses: actions/upload-artifact@v3
+        with:
+          name: manylinux-cuda${{ matrix.cuda-version }}-py${{ matrix.python-version }}-wheel
+          path: robocache/dist/*-manylinux*.whl
+
+  # ============================================================================
+  # Build Source Distribution
+  # ============================================================================
+  build-sdist:
+    name: Build Source Distribution
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+      
+      - name: Build sdist
+        run: |
+          cd robocache
+          python -m build --sdist
+      
+      - name: Check sdist
+        run: |
+          cd robocache
+          twine check dist/*
+          tar -tzf dist/*.tar.gz | head -50
+      
+      - name: Upload sdist
+        uses: actions/upload-artifact@v3
+        with:
+          name: source-distribution
+          path: robocache/dist/*.tar.gz
+
+  # ============================================================================
+  # Publish to PyPI (only on release)
+  # ============================================================================
+  publish-pypi:
+    name: Publish to PyPI
+    needs: [build-pure-wheel, build-manylinux-cuda-wheels, build-sdist]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.publish)
+    environment:
+      name: pypi
+      url: https://pypi.org/project/robocache/
+    permissions:
+      id-token: write  # For trusted publishing
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: dist/
+      
+      - name: Flatten artifacts
+        run: |
+          mkdir -p final-dist
+          find dist/ -name '*.whl' -exec cp {} final-dist/ \;
+          find dist/ -name '*.tar.gz' -exec cp {} final-dist/ \;
+          ls -lh final-dist/
+      
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: final-dist/
+          skip-existing: true
+          verbose: true
+
+  # ============================================================================
+  # Test Wheels
+  # ============================================================================
+  test-wheels:
+    name: Test Wheels
+    needs: [build-pure-wheel, build-manylinux-cuda-wheels]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ['3.8', '3.10', '3.11']
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      
+      - name: Download wheel
+        uses: actions/download-artifact@v3
+        with:
+          name: pure-python-wheel
+          path: dist/
+      
+      - name: Install wheel
+        run: |
+          pip install dist/*.whl
+      
+      - name: Test installation
+        run: |
+          python -c "import robocache; robocache.print_installation_info()"
+          python -c "import robocache; print(robocache.__version__)"
+      
+      - name: Run smoke tests
+        run: |
+          python -c "
+          import torch
+          import robocache
+          
+          # Test trajectory resampling
+          data = torch.randn(4, 50, 16, dtype=torch.float32)
+          src_t = torch.linspace(0, 1, 50).unsqueeze(0).expand(4, -1).contiguous()
+          tgt_t = torch.linspace(0, 1, 32).unsqueeze(0).expand(4, -1).contiguous()
+          result = robocache.resample_trajectories(data, src_t, tgt_t, backend='pytorch')
+          assert result.shape == (4, 32, 16)
+          print('✓ Trajectory resampling works')
+          "
+
