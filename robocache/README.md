@@ -153,8 +153,7 @@ voxel_grid = robocache.voxelize_occupancy(
 ### Requirements
 
 **For Production (CUDA backend - GPU-accelerated):**
-- **CUDA**: 12.0+
-- **CUTLASS**: 4.3.0
+- **CUDA**: 13.0+ (12.1+ also supported)
 - **PyTorch**: 2.0+ with CUDA support
 - **CMake**: 3.18+
 - **GPU**: NVIDIA H100 (validated), A100 and others supported
