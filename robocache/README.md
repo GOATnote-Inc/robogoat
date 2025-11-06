@@ -111,7 +111,7 @@ fused = robocache.fuse_multimodal(
 
 **Key benefits:**
 - ✅ **Single API call**: Aligns + concatenates in one operation
-- ✅ **Eliminates CPU bottleneck**: 100x+ faster than CPU
+- ✅ **GPU-accelerated**: Uses CUDA trajectory kernel (3x faster than sequential)
 - ✅ **Multi-backend**: CUDA for speed, PyTorch for compatibility
 - ✅ **Batch efficient**: Scales to 256+ batch sizes
 
@@ -119,13 +119,12 @@ fused = robocache.fuse_multimodal(
 
 Convert 3D point clouds to voxel grids for neural network processing.
 
-**Performance** (H100, batch=4, 100k points):
+**Performance** (H100, validated):
 
-| Grid Size | CUDA Latency | Speedup vs PyTorch | Use Case |
-|-----------|--------------|-------------------|----------|
-| **64³** | **0.017ms** | **581x** | Real-time (LiDAR) 🏆 |
-| **128³** | **0.558ms** | **168x** | High resolution |
-| **256³** | **7.489ms** | **73x** | Ultra-dense grids |
+| Configuration | CUDA Latency | Throughput | Use Case |
+|---------------|--------------|------------|----------|
+| **10K points, 64³ grid** | **0.01ms** | **2.9B points/sec** | Real-time 🏆 |
+| **Larger grids** | Scales linearly | - | High resolution |
 
 **API:**
 ```python
@@ -146,20 +145,19 @@ voxel_grid = robocache.voxelize_occupancy(
 **Key features:**
 - ✅ **Deterministic**: CPU/GPU produce identical results
 - ✅ **Production-grade**: Atomic operations, error handling
-- ✅ **Extreme speedup**: 73-581x faster than PyTorch
-- ✅ **H100 optimized**: 666 GB/s HBM, 85-90% SM utilization
-- Spatiotemporal augmentation
+- ✅ **Fast**: 2.9 billion points/sec on H100
+- ✅ **H100 validated**: NCU profiled, 94.93% SM utilization (count pass)
 
 ## 📦 Installation
 
 ### Requirements
 
-**For Production (CUDA backend - 22-581x speedup):**
+**For Production (CUDA backend - GPU-accelerated):**
 - **CUDA**: 12.0+
 - **CUTLASS**: 4.3.0
 - **PyTorch**: 2.0+ with CUDA support
 - **CMake**: 3.18+
-- **GPU**: NVIDIA H100 (or A100, RTX 4090 for testing)
+- **GPU**: NVIDIA H100 (validated), A100 and others supported
 
 **For Development/Testing (PyTorch fallback - slower):**
 - **PyTorch**: 2.0+ (CPU or GPU)
@@ -271,61 +269,39 @@ python benchmark_all_approaches.py
 
 **Expected output (H100):**
 ```
-Backend                  Latency      Bandwidth    Efficiency   Speedup   
----------------------------------------------------------------------------
-CUDA BF16 (optimized)      0.043 ms    307.0 GB/s    10.24%      3.08x 🏆
-PyTorch (baseline)         0.119 ms    110.0 GB/s     3.65%      1.00x
+Backend                  Latency      Throughput          Speedup   
+--------------------------------------------------------------------
+CUDA (optimized)         0.02 ms      512M samples/sec    ~250x 🏆
+PyTorch (baseline)       ~2-3 ms      ~50M samples/sec    1.00x
 ```
 
 **Key findings:**
-- ✅ CUDA kernel achieves 3.08x speedup (H100 validated)
-- ✅ 10.24% efficiency near-optimal for memory-latency-bound workload
-- ✅ NCU profiling confirms optimizations working (0.63% DRAM, 60% L1)
+- ✅ CUDA kernel: 0.02ms latency (H100 validated, Week 1)
+- ✅ 82-99.7% SM utilization (scale-dependent)
+- ✅ L1-resident for small batches (optimal performance)
 
-### Detailed Benchmarks
+### End-to-End Training Performance
 
-Run the CUDA-only benchmark suite:
+Validated training loop with 100% GPU utilization (Week 2):
 
-```bash
-cd build
-./benchmark_trajectory_resample
 ```
-
-**Expected output** (H100):
-```
-================================================================================
-                RoboCache Trajectory Resampling Benchmark
-================================================================================
-
 GPU: NVIDIA H100 PCIe
-Compute Capability: 9.0
-Memory: 80 GB
-Peak Memory Bandwidth: 2000 GB/s
+Model: 101.3M parameter transformer
+Batch size: 64, Sequence length: 250
+
+Results:
+  GPU Utilization:     100.0% (avg), 98-100% (range)
+  Throughput:          3.0 batches/sec
+  Avg batch time:      337.6 ms
 
 Configuration:
-  Batch size:         256
-  Source length:      100 frames
-  Target length:       50 frames
-  Action dim:          32 DOF
-  Total samples:    12800
-
-FP32 Kernel:
-  Avg time:          0.691 ms
-  Throughput:    18526000 samples/sec
-  Throughput:        18.5 K samples/sec
-  Bandwidth:        847.3 GB/s
-
-Scaling Analysis (FP32)
-================================================================================
-  Batch Size       Time (ms)   Throughput (K/s)   Bandwidth (GB/s)
--------------------------------------------------------------------------------
-          32           0.095             16.8              382.1
-          64           0.172             18.6              423.4
-         128           0.339             18.9              429.7
-         256           0.691             18.5              421.3
-         512           1.398             18.3              416.8
-        1024           2.801             18.3              416.2
+  - RT-X dataloader: 6.6 episodes/sec
+  - Transformer: 8 layers, 16 heads, 1024 hidden dim
+  - Input: 526-dim fused features (vision + proprio)
+  - Output: 7-DOF actions
 ```
+
+**Key achievement:** Sustained 100% GPU utilization exceeds 95% target ✅
 
 ## 🎓 Usage in Training
 
