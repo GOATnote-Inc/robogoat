@@ -1,0 +1,251 @@
+name: Performance Gates
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Nightly regression tests at 2 AM UTC
+    - cron: '0 2 * * *'
+
+env:
+  PERF_GUARD_ENFORCE: "1"  # Fail on performance regressions
+
+jobs:
+  benchmark-h100:
+    name: Benchmark H100
+    runs-on: [self-hosted, gpu, h100, linux]
+    if: github.event_name != 'schedule' || github.repository == 'GOATnote-Inc/robogoat'
+    
+    strategy:
+      matrix:
+        torch: ["2.5.0"]
+        cuda: ["12.1", "13.0"]
+        python: ["3.10"]
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # Need prev commit for baseline
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip wheel
+          pip install torch==${{ matrix.torch }}+cu${{ matrix.cuda }} --index-url https://download.pytorch.org/whl/cu${{ matrix.cuda }}
+          pip install -e .
+          pip install pytest pytest-benchmark numpy
+      
+      - name: GPU info
+        run: |
+          nvidia-smi
+          python -c "import torch; print(f'PyTorch: {torch.__version__}'); print(f'CUDA available: {torch.cuda.is_available()}'); print(f'GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else "None"}')"
+      
+      - name: Download baseline
+        id: baseline
+        continue-on-error: true
+        run: |
+          # Try to download baseline from previous successful run
+          gh run download --repo ${{ github.repository }} --name perf-baseline-h100-${{ matrix.cuda }} --dir bench/baseline/ || echo "No baseline found"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Run benchmarks
+        run: |
+          make bench
+          
+          # Compare against baseline if available
+          if [ -f "bench/baseline/baseline_h100_cu${{ matrix.cuda }}.json" ]; then
+            python scripts/compare_baseline.py \
+              --current bench/results/*.json \
+              --baseline bench/baseline/baseline_h100_cu${{ matrix.cuda }}.json \
+              --tolerance-p50 0.05 \
+              --tolerance-p99 0.10
+          fi
+      
+      - name: Run performance tests
+        run: |
+          PERF_GUARD_ENFORCE=1 pytest -v tests/perf/ \
+            --benchmark-json=bench/results/pytest_bench_${{ matrix.torch }}_${{ matrix.cuda }}.json
+      
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-h100-torch${{ matrix.torch }}-cuda${{ matrix.cuda }}
+          path: |
+            bench/results/*.csv
+            bench/results/*.json
+            bench/results/*.html
+      
+      - name: Save baseline
+        if: github.ref == 'refs/heads/main' && success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-baseline-h100-${{ matrix.cuda }}
+          path: bench/results/*.json
+      
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            // Find latest results file
+            const files = fs.readdirSync('bench/results/');
+            const jsonFile = files.find(f => f.endsWith('.json') && f.startsWith('benchmark_results'));
+            
+            if (!jsonFile) {
+              console.log('No results file found');
+              return;
+            }
+            
+            const results = JSON.parse(fs.readFileSync(`bench/results/${jsonFile}`, 'utf8'));
+            
+            // Format results table
+            let comment = '## 🚀 Performance Results (H100, CUDA ${{ matrix.cuda }})\n\n';
+            comment += '| Operation | Implementation | P50 (ms) | P99 (ms) | Variance | Speedup |\n';
+            comment += '|-----------|---------------|----------|----------|----------|----------|\n';
+            
+            const cudaResults = results.filter(r => r.implementation === 'cuda');
+            const pytorchResults = results.filter(r => r.implementation === 'pytorch');
+            
+            for (const cuda of cudaResults) {
+              const pytorch = pytorchResults.find(p => p.operation === cuda.operation);
+              const speedup = pytorch ? (pytorch.p50_mean / cuda.p50_mean).toFixed(2) : 'N/A';
+              
+              comment += `| ${cuda.operation} | CUDA | ${cuda.p50_mean.toFixed(3)} ± ${cuda.p50_std.toFixed(3)} | ${cuda.p99_mean.toFixed(3)} ± ${cuda.p99_std.toFixed(3)} | ${cuda.variance_pct.toFixed(1)}% | **${speedup}×** |\n`;
+            }
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.name,
+              body: comment
+            });
+
+  benchmark-a100:
+    name: Benchmark A100
+    runs-on: [self-hosted, gpu, a100, linux]
+    if: github.event_name != 'schedule' || github.repository == 'GOATnote-Inc/robogoat'
+    
+    strategy:
+      matrix:
+        torch: ["2.5.0"]
+        cuda: ["12.1"]
+        python: ["3.10"]
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip wheel
+          pip install torch==${{ matrix.torch }}+cu${{ matrix.cuda }} --index-url https://download.pytorch.org/whl/cu${{ matrix.cuda }}
+          pip install -e .
+          pip install pytest pytest-benchmark numpy
+      
+      - name: GPU info
+        run: |
+          nvidia-smi
+          python -c "import torch; print(f'PyTorch: {torch.__version__}'); print(f'CUDA: {torch.cuda.is_available()}'); print(f'GPU: {torch.cuda.get_device_name(0)}')"
+      
+      - name: Run benchmarks
+        run: make bench
+      
+      - name: Run performance tests
+        run: |
+          PERF_GUARD_ENFORCE=1 pytest -v tests/perf/
+      
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-a100-torch${{ matrix.torch }}-cuda${{ matrix.cuda }}
+          path: |
+            bench/results/*.csv
+            bench/results/*.json
+            bench/results/*.html
+
+  profile-nsight:
+    name: Nsight Profiling
+    runs-on: [self-hosted, gpu, h100, linux]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      
+      - name: Install dependencies
+        run: |
+          pip install -e .
+      
+      - name: Check Nsight tools
+        run: |
+          which nsys || echo "⚠️  Nsight Systems not found"
+          which ncu || echo "⚠️  Nsight Compute not found"
+          nsys --version || true
+          ncu --version || true
+      
+      - name: Profile all operations
+        run: |
+          make profile target=all
+      
+      - name: Upload Nsight artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nsight-traces-${{ github.sha }}
+          path: |
+            artifacts/nsys/*.nsys-rep
+            artifacts/nsys/*_kernels.txt
+            artifacts/ncu/*.ncu-rep
+            artifacts/ncu/*_metrics.csv
+          retention-days: 30
+
+  correctness-tests:
+    name: Correctness Tests
+    runs-on: [self-hosted, gpu, linux]
+    
+    strategy:
+      matrix:
+        python: ["3.10", "3.11"]
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      
+      - name: Install dependencies
+        run: |
+          pip install -e .
+          pip install pytest torch
+      
+      - name: Run correctness tests
+        run: |
+          pytest -v tests/ -m "not perf"
+      
+      - name: Test CPU fallback
+        run: |
+          # Ensure CPU fallback works
+          CUDA_VISIBLE_DEVICES="" pytest -v tests/test_trajectory_resample.py || true
+

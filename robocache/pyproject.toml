@@ -4,99 +4,69 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "robocache"
-version = "0.2.1"
-description = "GPU-accelerated data engine for robot learning, optimized for NVIDIA H100"
+version = "1.0.0"
+description = "Production-grade GPU acceleration for robot learning"
 readme = "README.md"
-requires-python = ">=3.8"
 license = {text = "Apache-2.0"}
 authors = [
-    {name = "RoboCache Team", email = "team@robocache.ai"}
+    {name = "Brandon Dent", email = "b@thegoatnote.com"}
 ]
-keywords = ["robotics", "machine-learning", "cuda", "gpu", "h100", "data-processing"]
+maintainers = [
+    {name = "Brandon Dent", email = "b@thegoatnote.com"}
+]
+keywords = [
+    "gpu", "cuda", "robotics", "machine-learning", "nvidia",
+    "robot-learning", "autonomous-driving", "foundation-models"
+]
 classifiers = [
-    "Development Status :: 4 - Beta",
-    "Intended Audience :: Science/Research",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: C++",
+    "Programming Language :: CUDA",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
-    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Hardware",
 ]
-
+requires-python = ">=3.10"
 dependencies = [
     "torch>=2.0.0",
-    "numpy>=1.21.0",
+    "numpy>=1.20.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-    "pytest-xdist>=3.0.0",
-    "black>=23.0.0",
-    "isort>=5.12.0",
-    "flake8>=6.0.0",
-    "mypy>=1.0.0",
+    "pytest>=7.0",
+    "pytest-benchmark>=4.0",
+    "black>=23.0",
+    "isort>=5.12",
+    "flake8>=6.0",
+    "mypy>=1.0",
 ]
-test = [
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-    "pytest-xdist>=3.0.0",
-]
-docs = [
-    "sphinx>=5.0.0",
-    "sphinx-rtd-theme>=1.2.0",
+bench = [
+    "pandas>=1.5.0",
+    "matplotlib>=3.5.0",
 ]
 
 [project.urls]
-Homepage = "https://github.com/robocache/robocache"
-Documentation = "https://robocache.readthedocs.io"
-Repository = "https://github.com/robocache/robocache"
-"Bug Tracker" = "https://github.com/robocache/robocache/issues"
+Homepage = "https://github.com/GOATnote-Inc/robogoat"
+Documentation = "https://github.com/GOATnote-Inc/robogoat/tree/main/robocache"
+Repository = "https://github.com/GOATnote-Inc/robogoat"
+Issues = "https://github.com/GOATnote-Inc/robogoat/issues"
+Changelog = "https://github.com/GOATnote-Inc/robogoat/releases"
 
-[tool.pytest.ini_options]
-minversion = "7.0"
-testpaths = ["tests"]
-python_files = ["test_*.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
-addopts = [
-    "-v",
-    "--strict-markers",
-    "--tb=short",
-    "--cov=robocache",
-    "--cov-report=term-missing",
-    "--cov-report=html",
-    "--cov-report=xml",
-]
-markers = [
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-    "cuda: marks tests that require CUDA",
-    "integration: marks integration tests",
-    "performance: marks performance benchmarks",
-]
+[tool.setuptools]
+packages = ["robocache"]
 
-[tool.coverage.run]
-source = ["robocache"]
-omit = ["*/tests/*", "*/setup.py"]
-
-[tool.coverage.report]
-exclude_lines = [
-    "pragma: no cover",
-    "def __repr__",
-    "raise AssertionError",
-    "raise NotImplementedError",
-    "if __name__ == .__main__.:",
-    "if TYPE_CHECKING:",
-]
+[tool.setuptools.package-data]
+robocache = ["*.so", "*.cu", "*.cuh", "*.h"]
 
 [tool.black]
 line-length = 100
-target-version = ['py38', 'py39', 'py310', 'py311']
+target-version = ['py310']
 include = '\.pyi?$'
 exclude = '''
 /(
@@ -123,9 +93,43 @@ use_parentheses = true
 ensure_newline_before_comments = true
 
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
 ignore_missing_imports = true
 
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q --strict-markers"
+testpaths = ["tests"]
+markers = [
+    "perf: performance tests with gates",
+    "slow: slow tests (deselect with '-m \"not slow\"')",
+    "gpu: requires GPU",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+[tool.cibuildwheel]
+# Build for Linux only (GPU kernels require Linux)
+build = "cp310-* cp311-*"
+skip = "pp* *-win* *-macosx*"
+
+[tool.cibuildwheel.linux]
+before-all = [
+    "yum install -y cuda-toolkit-12-1 || apt-get install -y nvidia-cuda-toolkit",
+]
+manylinux-x86_64-image = "manylinux2014"
+environment = {CUDA_HOME="/usr/local/cuda"}
+
+[[tool.cibuildwheel.overrides]]
+select = "*-manylinux_x86_64"
+environment = {CUDA_HOME="/usr/local/cuda-12.1", LD_LIBRARY_PATH="/usr/local/cuda-12.1/lib64:$LD_LIBRARY_PATH"}
+
+[[tool.cibuildwheel.overrides]]
+select = "*-manylinux_x86_64"
+before-build = [
+    "pip install torch==2.5.0+cu121 --index-url https://download.pytorch.org/whl/cu121",
+]
