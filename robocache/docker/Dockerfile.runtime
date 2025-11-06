@@ -1,0 +1,61 @@
+FROM nvidia/cuda:13.0.0-devel-ubuntu22.04
+
+LABEL maintainer="b@thegoatnote.com"
+LABEL description="RoboCache Runtime: CUDA 13.0 + ROS 2 Jazzy + TensorRT 10.0 + CUTLASS 4.3.0"
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV CUDA_HOME=/usr/local/cuda-13.0
+ENV PATH=$CUDA_HOME/bin:$PATH
+ENV LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
+
+# Core dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    git \
+    wget \
+    python3.10 \
+    python3.10-dev \
+    python3-pip \
+    libnvinfer8 \
+    libnvinfer-plugin8 \
+    && rm -rf /var/lib/apt/lists/*
+
+# ROS 2 Jazzy
+RUN apt-get update && apt-get install -y software-properties-common \
+    && add-apt-repository universe \
+    && apt-get update && apt-get install -y curl gnupg lsb-release \
+    && curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null \
+    && apt-get update && apt-get install -y \
+    ros-jazzy-desktop \
+    ros-jazzy-isaac-ros-common \
+    python3-colcon-common-extensions \
+    && rm -rf /var/lib/apt/lists/*
+
+# PyTorch (CUDA 13.0)
+RUN pip3 install --no-cache-dir \
+    torch==2.10.0.dev20251105+cu130 \
+    --index-url https://download.pytorch.org/whl/nightly/cu130
+
+# TensorRT 10.0
+RUN wget https://developer.download.nvidia.com/compute/machine-learning/tensorrt/10.0.0/tars/TensorRT-10.0.0.6.Linux.x86_64-gnu.cuda-13.0.tar.gz \
+    && tar -xzf TensorRT-10.0.0.6.Linux.x86_64-gnu.cuda-13.0.tar.gz -C /opt \
+    && rm TensorRT-10.0.0.6.Linux.x86_64-gnu.cuda-13.0.tar.gz
+ENV LD_LIBRARY_PATH=/opt/TensorRT-10.0.0.6/lib:$LD_LIBRARY_PATH
+
+# CUTLASS 4.3.0 (main branch)
+RUN cd /opt && git clone https://github.com/NVIDIA/cutlass.git \
+    && cd cutlass && git checkout main
+ENV CUTLASS_PATH=/opt/cutlass
+
+# RoboCache
+WORKDIR /workspace
+COPY . /workspace/robocache
+RUN cd /workspace/robocache && pip3 install -e .
+
+# ROS 2 setup
+RUN echo "source /opt/ros/jazzy/setup.bash" >> /root/.bashrc
+
+CMD ["/bin/bash"]
+
