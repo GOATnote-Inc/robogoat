@@ -17,8 +17,12 @@ RUN_NAME=${1:-trajectory_h100}
 OUTDIR="artifacts/profiling/${RUN_NAME}_${DATESTAMP}"
 mkdir -p "${OUTDIR}"
 
-# Set writable temp directory
-export TMPDIR="${OUTDIR}/tmp"
+# Set writable temp directory (use /tmp or create in artifacts)
+if [ -w "/tmp" ]; then
+  export TMPDIR="/tmp/robocache_profiling_$$"
+else
+  export TMPDIR="/home/${USER}/tmp/robocache_profiling_$$"
+fi
 mkdir -p "${TMPDIR}"
 
 echo "=== [1/6] Environment Check ==="
@@ -85,5 +89,9 @@ echo "=== [6/6] Summary ==="
 ls -lh "${OUTDIR}"
 echo ""
 echo "Reports written to: ${OUTDIR}"
+
+# Cleanup temp directory
+rm -rf "${TMPDIR}" 2>/dev/null || true
+
 echo "✅ PROFILING COMPLETE"
 
