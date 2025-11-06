@@ -93,7 +93,7 @@ torch::Tensor fuse_multimodal_cuda(
     bool use_bf16 = (stream1_data.dtype() == torch::kBFloat16);
     
     // Get CUDA stream
-    cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+    cudaStream_t stream = c10::cuda::getCurrentCUDAStream();
     
     // Launch kernel
     multimodal_fusion_cuda(

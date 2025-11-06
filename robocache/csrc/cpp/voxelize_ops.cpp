@@ -106,7 +106,7 @@ std::vector<torch::Tensor> voxelize_pointcloud_cuda(
     grid_min_f3.z = grid_min[2];
     
     // Get CUDA stream
-    cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+    cudaStream_t stream = c10::cuda::getCurrentCUDAStream();
     
     // Launch kernel
     voxelize_cuda(

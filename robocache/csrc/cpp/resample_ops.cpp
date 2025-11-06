@@ -61,7 +61,7 @@ torch::Tensor resample_trajectories_cuda(
                                    .device(source_data.device()));
     
     // Get CUDA stream
-    cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+    cudaStream_t stream = c10::cuda::getCurrentCUDAStream();
     
     // Launch kernel based on dtype
     if (source_data.dtype() == torch::kBFloat16) {
