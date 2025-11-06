@@ -1,0 +1,250 @@
+# Build and Publish PyPI Wheels with SLSA Attestation
+# Supports CUDA 12.1, 12.4, 13.0 variants for Linux x86_64
+
+name: Build and Publish
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (skip PyPI publish)'
+        required: false
+        default: 'true'
+
+# Required for SLSA attestation
+permissions:
+  id-token: write
+  contents: write
+  attestations: write
+
+jobs:
+  build-wheels:
+    name: Build wheels on Linux
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        cuda: ['121', '124', '130']  # CUDA 12.1, 12.4, 13.0
+        python: ['310', '311']        # Python 3.10, 3.11
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for versioning
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install CUDA Toolkit ${{ matrix.cuda }}
+        uses: Jimver/cuda-toolkit@v0.2.14
+        with:
+          cuda: ${{ matrix.cuda == '121' && '12.1.0' || (matrix.cuda == '124' && '12.4.0' || '13.0.0') }}
+          method: 'network'
+          sub-packages: '["nvcc", "cudart", "thrust"]'
+      
+      - name: Install PyTorch with CUDA ${{ matrix.cuda }}
+        run: |
+          if [ "${{ matrix.cuda }}" == "121" ]; then
+            pip install torch==2.5.0+cu121 --index-url https://download.pytorch.org/whl/cu121
+          elif [ "${{ matrix.cuda }}" == "124" ]; then
+            pip install torch==2.5.0+cu124 --index-url https://download.pytorch.org/whl/cu124
+          else
+            pip install torch==2.6.0.dev+cu130 --index-url https://download.pytorch.org/whl/nightly/cu130
+          fi
+      
+      - name: Install build dependencies
+        run: |
+          pip install --upgrade pip wheel setuptools build
+          pip install ninja  # Faster builds
+      
+      - name: Build wheel
+        working-directory: ./robocache
+        run: |
+          python -m build --wheel
+          # Rename wheel to include CUDA version
+          cd dist
+          for wheel in *.whl; do
+            newname=$(echo $wheel | sed "s/-cp${{ matrix.python }}-/-cu${{ matrix.cuda }}_cp${{ matrix.python }}-/")
+            mv "$wheel" "$newname"
+          done
+      
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheel-cu${{ matrix.cuda }}-py${{ matrix.python }}
+          path: robocache/dist/*.whl
+          retention-days: 7
+  
+  generate-sbom:
+    name: Generate SBOM
+    runs-on: ubuntu-latest
+    needs: build-wheels
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download all wheels
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+          pattern: wheel-*
+          merge-multiple: true
+      
+      - name: Install Syft (SBOM generator)
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+      
+      - name: Generate SBOM for each wheel
+        run: |
+          cd dist
+          for wheel in *.whl; do
+            syft packages "$wheel" -o cyclonedx-json > "${wheel%.whl}.sbom.json"
+            syft packages "$wheel" -o spdx-json > "${wheel%.whl}.spdx.json"
+          done
+      
+      - name: Upload SBOM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-files
+          path: |
+            dist/*.sbom.json
+            dist/*.spdx.json
+          retention-days: 90  # Longer retention for compliance
+  
+  attest-wheels:
+    name: SLSA Attestation
+    runs-on: ubuntu-latest
+    needs: [build-wheels, generate-sbom]
+    
+    steps:
+      - name: Download all wheels
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+          pattern: wheel-*
+          merge-multiple: true
+      
+      - name: Download SBOMs
+        uses: actions/download-artifact@v4
+        with:
+          name: sbom-files
+          path: dist/
+      
+      - name: Generate SLSA attestations
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: 'dist/*.whl'
+      
+      - name: Sign artifacts with Sigstore
+        uses: sigstore/gh-action-sigstore-python@v2.1.1
+        with:
+          inputs: dist/*.whl
+      
+      - name: Upload signed artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed-wheels-all
+          path: |
+            dist/*.whl
+            dist/*.whl.sigstore
+            dist/*.sbom.json
+            dist/*.spdx.json
+          retention-days: 90
+  
+  publish-pypi:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    needs: attest-wheels
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    environment:
+      name: pypi
+      url: https://pypi.org/p/robocache
+    
+    steps:
+      - name: Download signed wheels
+        uses: actions/download-artifact@v4
+        with:
+          name: signed-wheels-all
+          path: dist/
+      
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+          skip-existing: true
+          verbose: true
+          print-hash: true
+  
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: publish-pypi
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download signed wheels
+        uses: actions/download-artifact@v4
+        with:
+          name: signed-wheels-all
+          path: dist/
+      
+      - name: Extract release notes
+        id: extract
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
+          # Extract changelog section
+          awk "/^## \[?$VERSION\]?/{flag=1; next} /^## \[?[0-9]/{flag=0} flag" CHANGELOG.md > release_notes.md || echo "Release $VERSION" > release_notes.md
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            dist/*.whl
+            dist/*.whl.sigstore
+            dist/*.sbom.json
+            dist/*.spdx.json
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  
+  smoke-test:
+    name: Smoke Test Wheels
+    runs-on: ubuntu-latest
+    needs: build-wheels
+    strategy:
+      matrix:
+        cuda: ['121', '124']  # Skip 130 for now (nightly)
+        python: ['3.10', '3.11']
+    
+    steps:
+      - name: Download wheel
+        uses: actions/download-artifact@v4
+        with:
+          name: wheel-cu${{ matrix.cuda }}-py${{ matrix.python | replace('.', '') }}
+          path: dist/
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      
+      - name: Install wheel
+        run: |
+          pip install dist/*.whl
+      
+      - name: Run smoke test
+        run: |
+          python -c "import robocache; print(f'✓ RoboCache {robocache.__version__} imported')"
+          python -c "import robocache; print(f'✓ CUDA available: {robocache.is_cuda_available()}')"
+

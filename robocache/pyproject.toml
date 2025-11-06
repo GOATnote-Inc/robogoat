@@ -5,33 +5,45 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "robocache"
 version = "1.0.0"
-description = "Production-grade GPU acceleration for robot learning"
+description = "GPU-Accelerated Data Engine for Robot Foundation Models"
 readme = "README.md"
+requires-python = ">=3.10"
 license = {text = "Apache-2.0"}
 authors = [
-    {name = "Brandon Dent", email = "b@thegoatnote.com"}
+    {name = "GOATnote Inc", email = "b@thegoatnote.com"}
 ]
 maintainers = [
     {name = "Brandon Dent", email = "b@thegoatnote.com"}
 ]
 keywords = [
-    "gpu", "cuda", "robotics", "machine-learning", "nvidia",
-    "robot-learning", "autonomous-driving", "foundation-models"
+    "cuda",
+    "gpu",
+    "robotics",
+    "foundation-models",
+    "dataloader",
+    "pytorch",
+    "h100",
+    "a100",
+    "machine-learning",
+    "deep-learning",
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
-    "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: Apache Software License",
+    "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: C++",
     "Programming Language :: CUDA",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
-    "Topic :: System :: Hardware",
+    "Topic :: Scientific/Engineering :: Robotics",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Hardware :: Symmetric Multi-processing",
 ]
-requires-python = ">=3.10"
 dependencies = [
     "torch>=2.0.0",
     "numpy>=1.20.0",
@@ -39,97 +51,91 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0",
-    "pytest-benchmark>=4.0",
-    "black>=23.0",
-    "isort>=5.12",
-    "flake8>=6.0",
-    "mypy>=1.0",
+    "pytest>=7.0.0",
+    "pytest-benchmark>=4.0.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "mypy>=1.0.0",
+    "pre-commit>=3.0.0",
 ]
-bench = [
-    "pandas>=1.5.0",
-    "matplotlib>=3.5.0",
+profile = [
+    "nvidia-pyindex",
+]
+docs = [
+    "sphinx>=6.0.0",
+    "sphinx-rtd-theme>=1.2.0",
+    "sphinx-autodoc-typehints>=1.23.0",
 ]
 
 [project.urls]
 Homepage = "https://github.com/GOATnote-Inc/robogoat"
-Documentation = "https://github.com/GOATnote-Inc/robogoat/tree/main/robocache"
+Documentation = "https://github.com/GOATnote-Inc/robogoat/tree/main/docs"
 Repository = "https://github.com/GOATnote-Inc/robogoat"
-Issues = "https://github.com/GOATnote-Inc/robogoat/issues"
-Changelog = "https://github.com/GOATnote-Inc/robogoat/releases"
+"Bug Tracker" = "https://github.com/GOATnote-Inc/robogoat/issues"
+Changelog = "https://github.com/GOATnote-Inc/robogoat/blob/main/CHANGELOG.md"
 
 [tool.setuptools]
 packages = ["robocache"]
+package-dir = {"" = "python"}
 
 [tool.setuptools.package-data]
-robocache = ["*.so", "*.cu", "*.cuh", "*.h"]
+robocache = ["py.typed"]
 
+# Black formatting
 [tool.black]
 line-length = 100
-target-version = ['py310']
+target-version = ["py310", "py311"]
 include = '\.pyi?$'
-exclude = '''
+extend-exclude = '''
 /(
-    \.eggs
+  \.eggs
   | \.git
-  | \.hg
   | \.mypy_cache
-  | \.tox
+  | \.pytest_cache
   | \.venv
-  | _build
-  | buck-out
   | build
   | dist
 )/
 '''
 
+# isort import sorting
 [tool.isort]
 profile = "black"
 line_length = 100
-multi_line_output = 3
-include_trailing_comma = true
-force_grid_wrap = 0
-use_parentheses = true
-ensure_newline_before_comments = true
+skip_gitignore = true
+known_first_party = ["robocache"]
 
+# mypy type checking
 [tool.mypy]
 python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
-disallow_untyped_defs = false
+disallow_untyped_defs = false  # Allow for now (gradual typing)
 ignore_missing_imports = true
 
+# pytest configuration
 [tool.pytest.ini_options]
 minversion = "7.0"
 addopts = "-ra -q --strict-markers"
 testpaths = ["tests"]
 markers = [
-    "perf: performance tests with gates",
-    "slow: slow tests (deselect with '-m \"not slow\"')",
-    "gpu: requires GPU",
-]
-filterwarnings = [
-    "ignore::DeprecationWarning",
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "cuda: marks tests requiring CUDA",
+    "h100: marks tests requiring H100",
+    "a100: marks tests requiring A100",
 ]
 
-[tool.cibuildwheel]
-# Build for Linux only (GPU kernels require Linux)
-build = "cp310-* cp311-*"
-skip = "pp* *-win* *-macosx*"
+# Bandit security
+[tool.bandit]
+exclude_dirs = ["tests", "build", "dist"]
+skips = ["B101"]  # Allow assert in tests
 
-[tool.cibuildwheel.linux]
-before-all = [
-    "yum install -y cuda-toolkit-12-1 || apt-get install -y nvidia-cuda-toolkit",
-]
-manylinux-x86_64-image = "manylinux2014"
-environment = {CUDA_HOME="/usr/local/cuda"}
+# Coverage
+[tool.coverage.run]
+source = ["robocache"]
+omit = ["*/tests/*", "*/test_*.py"]
 
-[[tool.cibuildwheel.overrides]]
-select = "*-manylinux_x86_64"
-environment = {CUDA_HOME="/usr/local/cuda-12.1", LD_LIBRARY_PATH="/usr/local/cuda-12.1/lib64:$LD_LIBRARY_PATH"}
-
-[[tool.cibuildwheel.overrides]]
-select = "*-manylinux_x86_64"
-before-build = [
-    "pip install torch==2.5.0+cu121 --index-url https://download.pytorch.org/whl/cu121",
-]
+[tool.coverage.report]
+precision = 2
+show_missing = true
+skip_covered = false
