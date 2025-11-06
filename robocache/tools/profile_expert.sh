@@ -23,7 +23,7 @@ mkdir -p "${TMPDIR}"
 
 echo "=== [1/6] Environment Check ==="
 nvidia-smi --query-gpu=name,driver_version,pstate,utilization.gpu,temperature.gpu --format=csv
-nvcc --version | grep "release"
+which nvcc && nvcc --version | grep "release" || echo "WARNING: nvcc not in PATH"
 which nsys || { echo "WARNING: nsys not found, skipping NSYS"; SKIP_NSYS=1; }
 which ncu || { echo "WARNING: ncu not found, skipping NCU"; SKIP_NCU=1; }
 
