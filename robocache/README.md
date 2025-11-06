@@ -586,6 +586,24 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
+## Acknowledgments
+
+RoboCache builds upon decades of GPU computing research and stands on the shoulders of giants:
+
+- **NVIDIA:** CUDA Toolkit, Nsight Compute, Nsight Systems, CUTLASS 4.3.0, Isaac ROS, cuRobo, GR00T/GEAR
+- **PyTorch** (Meta AI): Deep learning framework, C++ Extension API
+- **FlashAttention 3** (Dao-AILab): Profiling methodology standards
+- **OpenAI Triton:** Auto-tuning inspiration
+- **Anthropic Claude:** AI-assisted development
+- **Cursor:** AI-first code editor
+- **Brev.dev:** H100/A100 GPU infrastructure
+
+Special thanks to the robotics community for datasets: **TartanAir** (CMU), **nuScenes** (Motional), **KITTI** (KIT/Toyota), **Isaac Gym** (NVIDIA).
+
+**Full citations:** See [ACKNOWLEDGMENTS.md](ACKNOWLEDGMENTS.md)
+
+---
+
 **Built with ❤️ for the robot learning community**
 
 *"What NVIDIA DALI is for vision, RoboCache is for robot learning"*
