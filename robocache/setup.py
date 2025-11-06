@@ -15,44 +15,68 @@ version = "1.0.0"
 # Read README
 long_description = (Path(__file__).parent / "README.md").read_text()
 
-# CUDA extension
-cuda_ext = None
+# CUDA extensions
+ext_modules = []
+
+# Common CUDA compile args
+cuda_compile_args = {
+    'cxx': ['-O3', '-std=c++17'],
+    'nvcc': [
+        '-O3',
+        '--use_fast_math',
+        '-std=c++17',
+        '--expt-relaxed-constexpr',
+        '-Xcompiler', '-fPIC',
+        # SM architectures
+        '-gencode', 'arch=compute_80,code=sm_80',  # A100
+        '-gencode', 'arch=compute_90,code=sm_90',  # H100
+    ]
+}
+
 if "--no-cuda" not in sys.argv:
     try:
-        cuda_ext = CUDAExtension(
+        # Trajectory resampling extension
+        ext_modules.append(CUDAExtension(
             name='robocache._cuda_ops',
             sources=[
                 'csrc/cpp/resample_ops.cpp',
                 'csrc/cuda/resample_kernel.cu',
             ],
-            include_dirs=[
-                'csrc/cpp',
-                'csrc/cuda',
+            include_dirs=['csrc/cpp', 'csrc/cuda'],
+            extra_compile_args=cuda_compile_args
+        ))
+        
+        # Multimodal fusion extension
+        ext_modules.append(CUDAExtension(
+            name='robocache._multimodal_ops',
+            sources=[
+                'csrc/cpp/multimodal_ops.cpp',
+                'csrc/cuda/multimodal_kernel.cu',
             ],
-            extra_compile_args={
-                'cxx': ['-O3', '-std=c++17'],
-                'nvcc': [
-                    '-O3',
-                    '--use_fast_math',
-                    '-std=c++17',
-                    '--expt-relaxed-constexpr',
-                    '-Xcompiler', '-fPIC',
-                    # SM architectures
-                    '-gencode', 'arch=compute_80,code=sm_80',  # A100
-                    '-gencode', 'arch=compute_90,code=sm_90',  # H100
-                ]
-            }
-        )
+            include_dirs=['csrc/cpp', 'csrc/cuda'],
+            extra_compile_args=cuda_compile_args
+        ))
+        
+        # Voxelization extension
+        ext_modules.append(CUDAExtension(
+            name='robocache._voxelize_ops',
+            sources=[
+                'csrc/cpp/voxelize_ops.cpp',
+                'csrc/cuda/voxelize_kernel.cu',
+            ],
+            include_dirs=['csrc/cpp', 'csrc/cuda'],
+            extra_compile_args=cuda_compile_args
+        ))
+        
+        print(f"✓ Building {len(ext_modules)} CUDA extensions")
+        
     except Exception as e:
         print(f"WARNING: CUDA extension build failed: {e}")
         print("Installing without CUDA support. Use --no-cuda to suppress this warning.")
-        cuda_ext = None
+        ext_modules = []
 else:
     sys.argv.remove("--no-cuda")
     print("Building without CUDA support (--no-cuda specified)")
-
-# Extensions list
-ext_modules = [cuda_ext] if cuda_ext else []
 
 setup(
     name="robocache",
