@@ -91,7 +91,7 @@ class RT_X_DataLoader:
 **Goal:** Prove 95%+ GPU utilization claim
 
 **Tasks:**
-- [ ] Build simple training loop (dummy model)
+- [ ] Build simple training loop (real working simple)
 - [ ] Measure GPU utilization over 100 batches
 - [ ] Profile with nvidia-smi, nvprof
 - [ ] Compare RoboCache vs PyTorch dataloader
