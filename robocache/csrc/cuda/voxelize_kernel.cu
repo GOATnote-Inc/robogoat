@@ -245,7 +245,7 @@ void voxelize_cuda(
             );
             break;
             
-        case MEAN:
+        case MEAN: {
             voxelize_mean_kernel<<<blocks, threads, 0, stream>>>(
                 points, features,
                 reinterpret_cast<float*>(voxel_grid),
@@ -262,6 +262,7 @@ void voxelize_cuda(
                 total_voxels, num_features
             );
             break;
+        }
             
         case MAX:
             voxelize_max_kernel<<<blocks, threads, 0, stream>>>(
