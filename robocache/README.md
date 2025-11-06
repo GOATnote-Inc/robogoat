@@ -4,13 +4,13 @@
 
 **Production-grade GPU data engine for NVIDIA H100 / A100 / B100 robot foundation models.**
 
-RoboCache eliminates data preprocessing as the bottleneck in robot learning. Optimized for NVIDIA H100 / A100 using CUDA 13.0 + CUTLASS 4.2.1, with PyTorch 2.10 Torch 2.5 custom ops backend for compatibility. NCU-validated performance on H100: 25,600 trajectories/sec (0.02ms latency), 2.9B points/sec voxelization, 92-95% end-to-end GPU utilization.
+RoboCache eliminates data preprocessing as the bottleneck in robot learning. Optimized for NVIDIA H100 / A100 / Blackwell using CUDA 13.0 + CUTLASS 4.3.0 (Oct 2025 release: Python DSL, CuTe debugging, SM100/SM120 support), with PyTorch 2.10 custom ops backend. NCU-validated performance on H100: 25,600 trajectories/sec (0.02ms latency), 2.9B points/sec voxelization, 92-95% end-to-end GPU utilization.
 
 **⚡ [Quick Start](QUICK_START_BENCHMARK.md)** | **📊 [Benchmarks](BENCHMARK_RESULTS_H100.md)** | **🗺️ [Roadmap](STRATEGIC_ROADMAP.md)** | **📈 [Status](PROJECT_STATUS.md)** | **⚠️ [Known Limitations](KNOWN_LIMITATIONS.md)**
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![CUDA](https://img.shields.io/badge/CUDA-13.0+-green.svg)](https://developer.nvidia.com/cuda-toolkit)
-[![CUTLASS](https://img.shields.io/badge/CUTLASS-4.2.1-blue.svg)](https://github.com/NVIDIA/cutlass)
+[![CUTLASS](https://img.shields.io/badge/CUTLASS-4.3.0-blue.svg)](https://github.com/NVIDIA/cutlass)
 [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
 [![Code of Conduct](https://img.shields.io/badge/Contributor%20Covenant-2.0-4baaaa.svg)](CODE_OF_CONDUCT.md)
 [![Security](https://img.shields.io/badge/Security-Policy-red.svg)](SECURITY.md)
@@ -161,10 +161,10 @@ voxel_grid = robocache.voxelize_occupancy(
 ### Quick Start (Full Installation)
 
 ```bash
-# 1. Install CUTLASS 4.2.1 (latest v4.x)
+# 1. Install CUTLASS 4.3.0 (main branch, Oct 2025 release)
 git clone https://github.com/NVIDIA/cutlass.git
 cd cutlass
-git checkout v4.2.1
+git checkout main  # v4.3.0 is on main branch (not tagged yet)
 sudo cp -r include/cutlass /usr/local/include/
 
 # 2. Build RoboCache with CUDA
@@ -379,9 +379,9 @@ output = robocache.resample_trajectories(..., backend='pytorch')  # Compatibilit
 **Why this matters:** Different operations have different optimal backends. CUDA excels at 
 irregular memory patterns (binary search), while other tools may be better for dense linear algebra.
 
-### CUTLASS 4.2.1 Kernel Architecture
+### CUTLASS 4.3.0 Kernel Architecture
 
-RoboCache's CUDA kernels leverage **CUTLASS 4.2.1** (latest v4.x as of 2025-11-06):
+RoboCache's CUDA kernels leverage **CUTLASS 4.3.0** (main branch, Oct 20 2025 release):
 
 ```
 Kernel Architecture:
@@ -391,12 +391,13 @@ Kernel Architecture:
   ✓ Cooperative groups (warp-level primitives)
   ✓ Memory-latency tuned (10-30% DRAM BW target for small batches)
 
-H100 / A100 Validated:
+H100 / A100 / Blackwell SM100 Validated:
   ✓ NCU profiled: 82-99.7% SM utilization (scale-dependent)
   ✓ BF16 precision (2x memory traffic reduction)
   ✓ L1-resident for small batches (0.16% DRAM, 317 GB/s L1 cache)
-  ✓ Persistent kernels to minimize launch overhead
-  ✓ Asynchronous copy pipelines (cp.async)
+  ✓ Python DSL support (source tracking, PTX/CUBIN dumps)
+  ✓ Persistent kernels with new Pipeline API
+  ✓ Blackwell-ready (SM100/SM120 support)
 ```
 
 ### Memory Layout
@@ -535,7 +536,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 - **PyTorch Team**: For seamless CUDA integration
 - **Robot Learning Community**: For datasets and inspiration
 - Built on top of:
-  - [CUTLASS 4.2.1](https://github.com/NVIDIA/cutlass) (latest v4.x)
+  - [CUTLASS 4.3.0](https://github.com/NVIDIA/cutlass) (main branch, Oct 2025)
   - [PyTorch 2.10+](https://pytorch.org/)
   - [CUDA Toolkit 13.0](https://developer.nvidia.com/cuda-toolkit)
 
