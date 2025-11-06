@@ -6,8 +6,11 @@ Optimized CUDA kernels for H100/A100 with BF16 support.
 
 __version__ = "1.0.0"
 
+import sys
+import platform
+from typing import Optional, TextIO
+
 import torch
-from typing import Optional
 
 # Try to import CUDA extensions
 _cuda_available = False
@@ -213,6 +216,36 @@ def is_cuda_available() -> bool:
     """Check if CUDA kernels are available"""
     return _cuda_available and _multimodal_available and _voxelize_available
 
+def _write_line(message: str, stream: TextIO) -> None:
+    """Write a single line to the provided stream."""
+    stream.write(f"{message}\n")
+
+
+def print_installation_info(stream: Optional[TextIO] = None) -> None:
+    """Print diagnostic information about the RoboCache installation."""
+    if stream is None:
+        stream = sys.stdout
+
+    python_version = platform.python_version()
+    torch_version = torch.__version__
+    cuda_version = getattr(torch.version, "cuda", None)
+    cuda_runtime = torch.version.cuda if cuda_version else "None"
+    gpu_name = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "N/A"
+
+    _write_line("RoboCache Installation Info", stream)
+    _write_line("=" * 60, stream)
+    _write_line(f"Version: {__version__}", stream)
+    _write_line(f"Python: {python_version}", stream)
+    _write_line(f"PyTorch: {torch_version}", stream)
+    _write_line(f"CUDA available: {torch.cuda.is_available()}", stream)
+    _write_line(f"CUDA runtime: {cuda_runtime}", stream)
+    _write_line(f"GPU: {gpu_name}", stream)
+    _write_line(f"CUDA kernels loaded: {_cuda_available}", stream)
+    _write_line(f"Multimodal kernels loaded: {_multimodal_available}", stream)
+    _write_line(f"Voxelize kernels loaded: {_voxelize_available}", stream)
+    _write_line("Module location: " + __file__, stream)
+
+
 def self_test():
     """
     Run quick self-test to verify installation.
@@ -261,5 +294,6 @@ __all__ = [
     'voxelize_pointcloud',
     'is_cuda_available',
     'self_test',
+    'print_installation_info',
     '__version__',
 ]
