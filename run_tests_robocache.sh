@@ -12,6 +12,9 @@
 
 set -e
 
+# Ensure local package is importable without installation
+export PYTHONPATH="$(pwd)/robocache/python:${PYTHONPATH}"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -88,15 +91,16 @@ python -c "import robocache; robocache.print_installation_info()"
 # Run tests
 echo ""
 echo -e "${GREEN}Running tests...${NC}"
-echo "pytest tests/ $PYTEST_ARGS"
+TEST_PATH="robocache/tests"
+echo "pytest $TEST_PATH $PYTEST_ARGS"
 echo ""
 
 if [ "$RUN_COVERAGE" = true ]; then
-    pytest tests/ $PYTEST_ARGS --cov=robocache --cov-report=term-missing --cov-report=html
+    pytest "$TEST_PATH" $PYTEST_ARGS --cov=robocache --cov-report=term-missing --cov-report=html
     echo ""
     echo -e "${GREEN}Coverage report generated: htmlcov/index.html${NC}"
 else
-    pytest tests/ $PYTEST_ARGS
+    pytest "$TEST_PATH" $PYTEST_ARGS
 fi
 
 # Print summary
