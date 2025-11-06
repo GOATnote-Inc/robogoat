@@ -1,0 +1,160 @@
+# Static Analysis with clang-tidy (CUDA-aware)
+# Enforces code quality standards for C++/CUDA kernels
+
+name: Static Analysis
+
+on:
+  pull_request:
+    paths:
+      - 'robocache/csrc/**/*.cpp'
+      - 'robocache/csrc/**/*.cu'
+      - 'robocache/csrc/**/*.h'
+      - 'robocache/csrc/**/*.cuh'
+  push:
+    branches: [main]
+    paths:
+      - 'robocache/csrc/**/*.cpp'
+      - 'robocache/csrc/**/*.cu'
+      - 'robocache/csrc/**/*.h'
+      - 'robocache/csrc/**/*.cuh'
+  workflow_dispatch:
+
+jobs:
+  clang-tidy:
+    name: clang-tidy (CUDA)
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install LLVM/clang-tidy 17
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 17
+          sudo apt-get install -y clang-tidy-17
+          sudo ln -sf /usr/bin/clang-tidy-17 /usr/bin/clang-tidy
+      
+      - name: Install CUDA Toolkit 13.0
+        uses: Jimver/cuda-toolkit@v0.2.14
+        with:
+          cuda: '13.0.0'
+          method: 'network'
+          sub-packages: '["nvcc", "cudart", "thrust"]'
+      
+      - name: Install PyTorch headers
+        run: |
+          pip install torch==2.5.0
+          echo "TORCH_INCLUDE=$(python -c 'import torch; import os; print(os.path.dirname(torch.__file__) + \"/include\")')" >> $GITHUB_ENV
+      
+      - name: Run clang-tidy on C++ files
+        working-directory: ./robocache
+        run: |
+          find csrc/cpp -name '*.cpp' | xargs clang-tidy \
+            -p=. \
+            --extra-arg=-std=c++17 \
+            --extra-arg=-I${TORCH_INCLUDE} \
+            --extra-arg=-I${TORCH_INCLUDE}/torch/csrc/api/include \
+            --extra-arg=-Icsrc/cpp \
+            --extra-arg=-Icsrc/cuda \
+            --warnings-as-errors='*' \
+            || true  # Don't fail on first run
+      
+      - name: Run clang-tidy on CUDA files
+        working-directory: ./robocache
+        run: |
+          find csrc/cuda -name '*.cu' | xargs clang-tidy \
+            -p=. \
+            --extra-arg=-std=c++17 \
+            --extra-arg=--cuda-gpu-arch=sm_90 \
+            --extra-arg=--cuda-path=/usr/local/cuda \
+            --extra-arg=-I/usr/local/cuda/include \
+            --extra-arg=-Icsrc/cpp \
+            --extra-arg=-Icsrc/cuda \
+            --warnings-as-errors='*' \
+            || true  # Don't fail on first run
+      
+      - name: Upload clang-tidy report
+        uses: actions/upload-artifact@v4
+        with:
+          name: clang-tidy-report
+          path: clang-tidy-report.txt
+          retention-days: 30
+  
+  cppcheck:
+    name: cppcheck
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install cppcheck
+        run: sudo apt-get install -y cppcheck
+      
+      - name: Run cppcheck
+        working-directory: ./robocache
+        run: |
+          cppcheck --enable=all \
+            --suppress=missingIncludeSystem \
+            --suppress=unusedFunction \
+            --inline-suppr \
+            --std=c++17 \
+            -I csrc/cpp \
+            -I csrc/cuda \
+            --xml --xml-version=2 \
+            csrc/ 2> cppcheck-report.xml || true
+      
+      - name: Upload cppcheck report
+        uses: actions/upload-artifact@v4
+        with:
+          name: cppcheck-report
+          path: robocache/cppcheck-report.xml
+          retention-days: 30
+  
+  header-guards:
+    name: Header Guard Validation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Check header guards
+        run: |
+          cd robocache
+          for header in $(find csrc -name '*.h' -o -name '*.hpp' -o -name '*.cuh'); do
+            if ! grep -q "#ifndef\|#pragma once" "$header"; then
+              echo "ERROR: $header missing header guard"
+              exit 1
+            fi
+          done
+          echo "✓ All headers have guards"
+  
+  include-what-you-use:
+    name: Include What You Use
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install IWYU
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y iwyu
+      
+      - name: Run IWYU on C++ files
+        working-directory: ./robocache
+        continue-on-error: true  # IWYU is strict, allow failures initially
+        run: |
+          find csrc/cpp -name '*.cpp' | xargs iwyu \
+            -std=c++17 \
+            -Icsrc/cpp \
+            -Icsrc/cuda \
+            2>&1 | tee iwyu-report.txt
+      
+      - name: Upload IWYU report
+        uses: actions/upload-artifact@v4
+        with:
+          name: iwyu-report
+          path: robocache/iwyu-report.txt
+          retention-days: 30
+

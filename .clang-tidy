@@ -1,0 +1,103 @@
+# clang-tidy configuration for RoboCache
+# CUDA-aware static analysis for C++/CUDA code quality
+
+---
+# Checks configuration
+Checks: '
+  -*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-implicit-widening-of-multiplication-result,
+  cert-*,
+  clang-analyzer-*,
+  concurrency-*,
+  cppcoreguidelines-*,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+  -cppcoreguidelines-pro-bounds-constant-array-index,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-pro-type-reinterpret-cast,
+  -cppcoreguidelines-avoid-c-arrays,
+  google-*,
+  -google-readability-todo,
+  -google-runtime-references,
+  hicpp-*,
+  -hicpp-avoid-c-arrays,
+  -hicpp-no-array-decay,
+  -hicpp-use-auto,
+  misc-*,
+  -misc-non-private-member-variables-in-classes,
+  modernize-*,
+  -modernize-avoid-c-arrays,
+  -modernize-use-trailing-return-type,
+  -modernize-use-auto,
+  performance-*,
+  readability-*,
+  -readability-identifier-length,
+  -readability-function-cognitive-complexity,
+  -readability-magic-numbers,
+  -readability-uppercase-literal-suffix,
+'
+
+# Options for specific checks
+CheckOptions:
+  # Naming conventions
+  - key: readability-identifier-naming.NamespaceCase
+    value: lower_case
+  - key: readability-identifier-naming.ClassCase
+    value: CamelCase
+  - key: readability-identifier-naming.StructCase
+    value: CamelCase
+  - key: readability-identifier-naming.FunctionCase
+    value: lower_case
+  - key: readability-identifier-naming.VariableCase
+    value: lower_case
+  - key: readability-identifier-naming.ParameterCase
+    value: lower_case
+  - key: readability-identifier-naming.EnumCase
+    value: CamelCase
+  - key: readability-identifier-naming.EnumConstantCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.ConstantCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.GlobalConstantCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.MacroDefinitionCase
+    value: UPPER_CASE
+  
+  # CUDA-specific: Allow device/global functions
+  - key: readability-identifier-naming.FunctionIgnoredRegexp
+    value: '__global__|__device__|__host__'
+  
+  # Performance tuning
+  - key: performance-unnecessary-copy-initialization.AllowedTypes
+    value: 'torch::Tensor'
+  - key: performance-move-const-arg.CheckTriviallyCopyableMove
+    value: false
+  
+  # Readability
+  - key: readability-function-size.LineThreshold
+    value: 150
+  - key: readability-function-size.StatementThreshold
+    value: 100
+  
+  # Modernize
+  - key: modernize-use-nullptr.NullMacros
+    value: 'NULL'
+  
+  # Cert
+  - key: cert-err33-c.CheckedFunctions
+    value: '::aligned_alloc;::malloc;::calloc;::realloc;::cudaMalloc;::cudaMallocManaged;::cudaMallocHost'
+
+# Header filter (only analyze our headers)
+HeaderFilterRegex: '(csrc|robocache)/.*\.(h|hpp|cuh)$'
+
+# Warnings as errors
+WarningsAsErrors: ''
+
+# System headers
+SystemHeaders: false
+
+# Format style for fixes
+FormatStyle: google
+
