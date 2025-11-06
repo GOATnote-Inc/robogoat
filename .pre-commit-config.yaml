@@ -1,0 +1,221 @@
+# Pre-commit hooks for RoboCache
+# https://pre-commit.com/
+#
+# Install: pre-commit install
+# Run manually: pre-commit run --all-files
+# Update: pre-commit autoupdate
+
+repos:
+  # ============================================================================
+  # General File Checks
+  # ============================================================================
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: ['--allow-multiple-documents']
+      - id: check-json
+      - id: check-toml
+      - id: check-added-large-files
+        args: ['--maxkb=5000']  # 5MB limit
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+      - id: detect-private-key
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+
+  # ============================================================================
+  # Python Code Formatting
+  # ============================================================================
+  - repo: https://github.com/psf/black
+    rev: 23.12.1
+    hooks:
+      - id: black
+        language_version: python3.10
+        args: ['--line-length=100', '--target-version=py310']
+        files: \.py$
+
+  # ============================================================================
+  # Python Import Sorting
+  # ============================================================================
+  - repo: https://github.com/PyCQA/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: ['--profile=black', '--line-length=100']
+        files: \.py$
+
+  # ============================================================================
+  # Python Linting
+  # ============================================================================
+  - repo: https://github.com/PyCQA/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        args:
+          - --max-line-length=100
+          - --extend-ignore=E203,W503,E501
+          - --max-complexity=15
+        files: \.py$
+        exclude: ^(build/|dist/|\.eggs/)
+
+  # ============================================================================
+  # Python Type Checking
+  # ============================================================================
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        args: [--ignore-missing-imports, --check-untyped-defs]
+        additional_dependencies: ['types-all']
+        files: ^robocache/python/.*\.py$
+        exclude: ^tests/
+
+  # ============================================================================
+  # Python Security Checks
+  # ============================================================================
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.6
+    hooks:
+      - id: bandit
+        args: ['-c', 'pyproject.toml', '-r', '.']
+        additional_dependencies: ['.[toml]']
+        files: \.py$
+        exclude: ^tests/
+
+  # ============================================================================
+  # Python Docstring Checks
+  # ============================================================================
+  - repo: https://github.com/PyCQA/pydocstyle
+    rev: 6.3.0
+    hooks:
+      - id: pydocstyle
+        args:
+          - --convention=google
+          - --add-ignore=D100,D104,D105,D107
+        files: ^robocache/python/.*\.py$
+
+  # ============================================================================
+  # C++/CUDA Formatting (clang-format)
+  # ============================================================================
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v17.0.6
+    hooks:
+      - id: clang-format
+        types_or: [c++, c, cuda]
+        files: \.(cpp|cu|cuh|h|hpp)$
+        args: ['-style=Google', '-i']
+
+  # ============================================================================
+  # Markdown Linting
+  # ============================================================================
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.39.0
+    hooks:
+      - id: markdownlint
+        args: ['--config', '.markdownlint.yaml', '--fix']
+        files: \.md$
+        exclude: ^(docs/internal/|CHANGELOG.md)
+
+  # ============================================================================
+  # YAML Linting
+  # ============================================================================
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        args: ['-d', '{extends: default, rules: {line-length: {max: 120}}}']
+        files: \.(yaml|yml)$
+
+  # ============================================================================
+  # Shell Script Linting
+  # ============================================================================
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.9.0.6
+    hooks:
+      - id: shellcheck
+        args: ['-x', '-e', 'SC1091']  # Ignore sourcing errors
+        files: \.sh$
+
+  # ============================================================================
+  # Dockerfile Linting
+  # ============================================================================
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.1-beta
+    hooks:
+      - id: hadolint-docker
+        args: ['--ignore', 'DL3008', '--ignore', 'DL3009']
+        files: Dockerfile.*
+
+  # ============================================================================
+  # Git Commit Message Formatting
+  # ============================================================================
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v3.0.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args: ['--strict']
+
+  # ============================================================================
+  # CUDA-Specific Checks (Custom)
+  # ============================================================================
+  - repo: local
+    hooks:
+      - id: cuda-style-check
+        name: CUDA Style Check
+        entry: bash -c 'if [ -f "scripts/cuda_style_check.sh" ]; then bash scripts/cuda_style_check.sh; fi'
+        language: system
+        files: \.(cu|cuh)$
+        pass_filenames: false
+
+      - id: pytest-check
+        name: Fast Unit Tests
+        entry: bash -c 'pytest tests/ -m "not slow" --maxfail=1 -q'
+        language: system
+        files: \.py$
+        pass_filenames: false
+        stages: [push]  # Only run on push, not commit
+
+      - id: copyright-header
+        name: Copyright Header Check
+        entry: python scripts/check_copyright.py
+        language: python
+        files: \.(py|cpp|cu|h)$
+        pass_filenames: true
+
+# ============================================================================
+# Configuration
+# ============================================================================
+default_language_version:
+  python: python3.10
+
+default_stages: [commit, push]
+
+# Files to exclude globally
+exclude: |
+  (?x)^(
+    \.eggs/|
+    \.git/|
+    \.mypy_cache/|
+    \.pytest_cache/|
+    \.venv/|
+    build/|
+    dist/|
+    __pycache__/|
+    .*\.egg-info/|
+    .*\.so$|
+    .*\.pyc$|
+    .*\.pyo$
+  )
+
+# Fail fast on first error
+fail_fast: false
+
+# Minimum pre-commit version
+minimum_pre_commit_version: '3.0.0'
+

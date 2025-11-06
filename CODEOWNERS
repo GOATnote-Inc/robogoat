@@ -1,0 +1,50 @@
+# CODEOWNERS - Code Review Ownership
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+#
+# Owner: Brandon Dent <b@thegoatnote.com>
+# Organization: GOATnote Inc
+
+# ==============================================================================
+# Default Owner (All Files)
+# ==============================================================================
+* b@thegoatnote.com
+
+# ==============================================================================
+# Critical Paths (Explicit Ownership)
+# ==============================================================================
+
+# CUDA Kernels & GPU Code
+/robocache/csrc/cuda/           b@thegoatnote.com
+/robocache/csrc/cpp/            b@thegoatnote.com
+*.cu                            b@thegoatnote.com
+*.cuh                           b@thegoatnote.com
+
+# Python API & Extensions
+/robocache/python/              b@thegoatnote.com
+/robocache/setup.py             b@thegoatnote.com
+/robocache/pyproject.toml       b@thegoatnote.com
+
+# Testing Infrastructure
+/robocache/tests/               b@thegoatnote.com
+/robocache/bench/               b@thegoatnote.com
+
+# CI/CD & Automation
+/.github/workflows/             b@thegoatnote.com
+
+# Documentation
+/docs/                          b@thegoatnote.com
+README.md                       b@thegoatnote.com
+ROADMAP.md                      b@thegoatnote.com
+
+# Security & Compliance
+SECURITY.md                     b@thegoatnote.com
+LICENSE                         b@thegoatnote.com
+
+# Build System
+/robocache/Makefile             b@thegoatnote.com
+CMakeLists.txt                  b@thegoatnote.com
+
+# Configuration
+CODEOWNERS                      b@thegoatnote.com
+.gitignore                      b@thegoatnote.com
+.pre-commit-config.yaml         b@thegoatnote.com
