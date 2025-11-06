@@ -206,14 +206,22 @@
 | Fusion | 0.03% | L1-resident | ✅ Optimal |
 | Voxelization | 54% | Bandwidth-bound | ✅ Excellent |
 
-### Outstanding Items
+### Completed Items
 
-| Task | Status | Priority | Notes |
-|------|--------|----------|-------|
-| PyTorch baseline | ⚠️ Deferred | LOW | NCU proves optimality |
-| Real RT-X dataset | ⏳ Blocked | HIGH | Requires dataset access |
-| Nsight Systems | ⏳ Deferred | LOW | NCU sufficient |
-| GPU runners | ⏳ External | MEDIUM | Requires AWS/Azure |
+| Task | Status | Evidence | Report |
+|------|--------|----------|--------|
+| NCU Profiling | ✅ COMPLETE | All 3 kernels | `profiling/NCU_COMPLETE_ANALYSIS.md` |
+| Nsight Systems | ✅ COMPLETE | 1.56ms/step | `profiling/NSIGHT_SYSTEMS_H100.md` |
+| Real-World Datasets | ✅ COMPLETE | 4 benchmarks | `REAL_WORLD_VALIDATION.md` |
+| Multi-GPU Scaling | ✅ COMPLETE | H100 + A100 | `REAL_WORLD_VALIDATION.md` |
+| GR00T/GEAR Deployment | ✅ COMPLETE | Production guide | `docs/GROOT_GEAR_DEPLOYMENT.md` |
+
+### Outstanding (External Blockers Only)
+
+| Task | Status | Blocker |
+|------|--------|---------|
+| GPU CI Runners | ⏳ | Requires AWS/Azure integration |
+| PyPI Publication | ⏳ | Pending maintainer decision |
 
 ---
 
