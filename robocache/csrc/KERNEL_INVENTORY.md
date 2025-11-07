@@ -1,8 +1,8 @@
 # CUDA Kernel Inventory
 
-Canonical list of shipped CUDA kernels in RoboCache.
+**Canonical list of shipped CUDA kernels in RoboCache.**
 
-## Shipped Kernels
+## Shipped Kernels (Canonical)
 
 ### 1. Trajectory Resampling
 **File:** `csrc/cuda/resample_kernel.cu`  
