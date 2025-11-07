@@ -1,5 +1,8 @@
 # Build and Publish PyPI Wheels with SLSA Attestation
 # Supports CUDA 12.1, 12.4, 13.0 variants for Linux x86_64
+# 
+# IMPORTANT: This workflow ONLY runs on version tags (v*.*.*)
+# It does NOT run on regular commits to main/branches
 
 name: Build and Publish
 
@@ -7,6 +10,8 @@ on:
   push:
     tags:
       - 'v*.*.*'
+    branches-ignore:
+      - '**'  # Explicitly ignore all branches
   workflow_dispatch:
     inputs:
       dry_run:
