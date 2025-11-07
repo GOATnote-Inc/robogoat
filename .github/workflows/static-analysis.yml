@@ -10,13 +10,6 @@ on:
       - 'robocache/csrc/**/*.cu'
       - 'robocache/csrc/**/*.h'
       - 'robocache/csrc/**/*.cuh'
-  push:
-    branches: [main]
-    paths:
-      - 'robocache/csrc/**/*.cpp'
-      - 'robocache/csrc/**/*.cu'
-      - 'robocache/csrc/**/*.h'
-      - 'robocache/csrc/**/*.cuh'
   workflow_dispatch:
 
 jobs:
