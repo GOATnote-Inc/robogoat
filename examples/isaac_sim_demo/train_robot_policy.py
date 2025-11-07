@@ -183,8 +183,8 @@ class RoboCachePreprocessor(nn.Module):
             mode='occupancy'
         )
         
-        # Summarize voxel grid
-        voxel_summary = voxel_grid.mean(dim=[0, 1, 2]).unsqueeze(0).unsqueeze(0).expand(fused.shape[0], fused.shape[1], -1)
+        # Summarize voxel grid (convert to float for mean operation)
+        voxel_summary = voxel_grid.float().mean(dim=[0, 1, 2]).unsqueeze(0).unsqueeze(0).expand(fused.shape[0], fused.shape[1], -1)
         
         return torch.cat([fused, voxel_summary], dim=-1)
 
