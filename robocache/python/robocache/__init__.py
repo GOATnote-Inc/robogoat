@@ -35,6 +35,9 @@ try:
 except ImportError:
     _voxelize_ops = None
 
+# Always import CPU fallbacks (production requirement)
+from robocache import ops_fallback
+
 def resample_trajectories(
     source_data: torch.Tensor,
     source_times: torch.Tensor,
@@ -140,16 +143,17 @@ def fuse_multimodal(
         >>> fused.shape
         torch.Size([4, 50, 588])  # 512 + 64 + 12
     """
-    if not _multimodal_available:
-        raise RuntimeError(
-            "Multimodal fusion CUDA kernel not available. "
-            "Install RoboCache with: pip install robocache[cuda]"
+    # Use CUDA kernel if available and on CUDA device
+    if _multimodal_available and stream1_data.is_cuda:
+        return _multimodal_ops.fuse_multimodal(
+            stream1_data, stream1_times,
+            stream2_data, stream2_times,
+            stream3_data, stream3_times,
+            target_times
         )
     
-    if not stream1_data.is_cuda:
-        raise ValueError("All inputs must be on CUDA device for multimodal fusion")
-    
-    return _multimodal_ops.fuse_multimodal(
+    # Fallback to CPU implementation (vectorized PyTorch)
+    return ops_fallback.resample_trajectories_cpu(
         stream1_data, stream1_times,
         stream2_data, stream2_times,
         stream3_data, stream3_times,
@@ -196,21 +200,18 @@ def voxelize_pointcloud(
         >>> grid.shape
         torch.Size([128, 128, 128, 8])
     """
-    if not _voxelize_available:
-        raise RuntimeError(
-            "Voxelization CUDA kernel not available. "
-            "Install RoboCache with: pip install robocache[cuda]"
+    # Use CUDA kernel if available and on CUDA device
+    if _voxelize_available and points.is_cuda:
+        results = _voxelize_ops.voxelize_pointcloud(
+            points, features if features is not None else torch.empty(0),
+            grid_min, voxel_size, grid_size, mode
         )
+        return results[0]  # Return voxel_grid (discard counts if mean mode)
     
-    if not points.is_cuda:
-        raise ValueError("points must be on CUDA device")
-    
-    results = _voxelize_ops.voxelize_pointcloud(
-        points, features if features is not None else torch.empty(0),
-        grid_min, voxel_size, grid_size, mode
+    # Fallback to CPU implementation (vectorized PyTorch)
+    return ops_fallback.voxelize_pointcloud_cpu(
+        points, features, tuple(grid_min), voxel_size, tuple(grid_size), mode
     )
-    
-    return results[0]  # Return voxel_grid (discard counts if mean mode)
 
 def is_cuda_available() -> bool:
     """Check if CUDA kernels are available"""
