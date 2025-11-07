@@ -1,0 +1,27 @@
+# Isaac Sim End-to-End Demo Requirements
+
+# Core dependencies
+torch>=2.5.0
+numpy>=1.24.0
+robocache>=1.0.0
+
+# Isaac Sim (installed separately via Omniverse Launcher)
+# Download from: https://developer.nvidia.com/isaac-sim
+
+# Training
+gym>=0.26.0
+stable-baselines3>=2.0.0
+
+# Profiling
+nvidia-pyindex
+nvidia-nsight-systems>=2024.5.0  # Optional, for profiling
+
+# Visualization
+matplotlib>=3.7.0
+seaborn>=0.12.0
+tensorboard>=2.14.0
+
+# Utils
+pyyaml>=6.0
+tqdm>=4.65.0
+
