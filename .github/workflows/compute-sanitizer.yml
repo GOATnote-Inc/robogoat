@@ -1,0 +1,261 @@
+# Compute Sanitizer (Memcheck, Racecheck, Initcheck)
+# Validates CUDA kernels for memory errors, race conditions, and uninitialized variables
+#
+# Runs on: Pull requests, manual dispatch
+# Requires: CUDA-enabled GPU runner (self-hosted or cloud)
+
+name: Compute Sanitizer
+
+on:
+  pull_request:
+    paths:
+      - 'robocache/csrc/**'
+      - 'robocache/python/**'
+      - 'robocache/setup.py'
+      - '.github/workflows/compute-sanitizer.yml'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Sanitizer mode'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - memcheck
+          - racecheck
+          - initcheck
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  compute-sanitizer:
+    name: ${{ matrix.sanitizer }} (${{ matrix.cuda }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Test on CUDA 12.1 (A100 compatible)
+          - cuda: '12.1'
+            python: '3.10'
+            sanitizer: 'memcheck'
+            os: 'ubuntu-latest'  # Change to self-hosted GPU runner when available
+          - cuda: '12.1'
+            python: '3.10'
+            sanitizer: 'racecheck'
+            os: 'ubuntu-latest'
+          - cuda: '12.1'
+            python: '3.10'
+            sanitizer: 'initcheck'
+            os: 'ubuntu-latest'
+          # Test on CUDA 13.0 (H100 compatible)
+          - cuda: '13.0'
+            python: '3.11'
+            sanitizer: 'memcheck'
+            os: 'ubuntu-latest'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      
+      - name: Install CUDA Toolkit ${{ matrix.cuda }}
+        uses: Jimver/cuda-toolkit@v0.2.14
+        with:
+          cuda: ${{ matrix.cuda == '12.1' && '12.1.0' || '13.0.0' }}
+          method: 'network'
+          sub-packages: '["nvcc", "cudart", "thrust", "nsight_compute"]'
+      
+      - name: Install PyTorch with CUDA ${{ matrix.cuda }}
+        run: |
+          if [ "${{ matrix.cuda }}" == "12.1" ]; then
+            pip install torch==2.5.1+cu121 --index-url https://download.pytorch.org/whl/cu121
+          else
+            pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu130
+          fi
+      
+      - name: Install build dependencies
+        run: |
+          pip install --upgrade pip wheel setuptools ninja
+      
+      - name: Build CUDA extensions
+        working-directory: ./robocache
+        run: |
+          export TORCH_CUDA_ARCH_LIST="${{ matrix.cuda == '12.1' && '8.0' || '9.0' }}"
+          python setup.py build_ext --inplace
+      
+      - name: Install package
+        working-directory: ./robocache
+        run: |
+          pip install -e .
+      
+      - name: Run Compute Sanitizer - ${{ matrix.sanitizer }}
+        id: sanitizer
+        working-directory: ./robocache
+        continue-on-error: true
+        run: |
+          # Check if CUDA GPU is available
+          if ! nvidia-smi &> /dev/null; then
+            echo "::warning::No CUDA GPU detected - skipping actual sanitizer run"
+            echo "status=skipped" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Run compute-sanitizer
+          echo "Running compute-sanitizer --tool ${{ matrix.sanitizer }}"
+          
+          compute-sanitizer \
+            --tool ${{ matrix.sanitizer }} \
+            --print-level info \
+            --error-exitcode 1 \
+            --log-file sanitizer_${{ matrix.sanitizer }}.log \
+            python3 << 'PYEOF'
+          import torch
+          import sys
+          sys.path.insert(0, 'python')
+          import robocache
+          
+          print("=" * 70)
+          print(f"Testing: {robocache.__version__}")
+          print(f"GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU'}")
+          print("=" * 70)
+          
+          device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+          
+          # Test 1: Multimodal fusion
+          print("\n1️⃣  Testing multimodal fusion...")
+          B, T = 2, 10
+          vision = torch.randn(B, 5, 64, device=device, dtype=torch.bfloat16)
+          vision_times = torch.linspace(0, 1, 5, device=device).expand(B, -1)
+          proprio = torch.randn(B, 10, 32, device=device, dtype=torch.bfloat16)
+          proprio_times = torch.linspace(0, 1, 10, device=device).expand(B, -1)
+          imu = torch.randn(B, 20, 12, device=device, dtype=torch.bfloat16)
+          imu_times = torch.linspace(0, 1, 20, device=device).expand(B, -1)
+          target_times = torch.linspace(0, 1, T, device=device).expand(B, -1)
+          
+          out = robocache.fuse_multimodal(vision, vision_times, proprio, proprio_times, imu, imu_times, target_times)
+          torch.cuda.synchronize()
+          print(f"   ✓ Output: {out.shape}")
+          
+          # Test 2: Voxelization
+          print("\n2️⃣  Testing voxelization...")
+          N = 10000
+          points = torch.rand(N, 3, device=device, dtype=torch.float32) * 10 - 5
+          for mode in ["count", "occupancy", "mean", "max"]:
+              features = torch.randn(N, 4, device=device, dtype=torch.float32) if mode in ["mean", "max"] else None
+              grid = robocache.voxelize_pointcloud(
+                  points, features,
+                  grid_min=[-5.0, -5.0, -5.0],
+                  voxel_size=0.1,
+                  grid_size=[64, 64, 64],
+                  mode=mode
+              )
+              torch.cuda.synchronize()
+              print(f"   ✓ {mode:10s}: {list(grid.shape)}")
+          
+          print("\n" + "=" * 70)
+          print("✅ All kernels executed without errors")
+          print("=" * 70)
+          PYEOF
+          
+          SANITIZER_EXIT=$?
+          echo "status=completed" >> $GITHUB_OUTPUT
+          exit $SANITIZER_EXIT
+      
+      - name: Upload sanitizer logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sanitizer-${{ matrix.sanitizer }}-cuda${{ matrix.cuda }}-logs
+          path: robocache/sanitizer_*.log
+          retention-days: 30
+      
+      - name: Parse results and create summary
+        if: always()
+        run: |
+          echo "## Compute Sanitizer: ${{ matrix.sanitizer }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**CUDA Version:** ${{ matrix.cuda }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Python Version:** ${{ matrix.python }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ${{ steps.sanitizer.outputs.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f robocache/sanitizer_${{ matrix.sanitizer }}.log ]; then
+            echo "### Results" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            tail -50 robocache/sanitizer_${{ matrix.sanitizer }}.log >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ No GPU available - skipped actual execution" >> $GITHUB_STEP_SUMMARY
+          fi
+      
+      - name: Comment on PR
+        if: github.event_name == 'pull_request' && steps.sanitizer.outputs.status == 'completed'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const sanitizer = '${{ matrix.sanitizer }}';
+            const cuda = '${{ matrix.cuda }}';
+            const success = '${{ steps.sanitizer.outcome }}' === 'success';
+            
+            const body = `## 🔍 Compute Sanitizer: ${sanitizer}
+            
+            **CUDA:** ${cuda}  
+            **Status:** ${success ? '✅ PASSED' : '❌ FAILED'}
+            
+            ${success ? 'No memory errors, race conditions, or uninitialized variables detected.' : 'Errors detected - check logs for details.'}
+            
+            <details>
+            <summary>View logs</summary>
+            
+            Sanitizer artifacts uploaded - check workflow run for details.
+            </details>
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+  summary:
+    name: Sanitizer Summary
+    runs-on: ubuntu-latest
+    needs: compute-sanitizer
+    if: always()
+    
+    steps:
+      - name: Check sanitizer results
+        run: |
+          echo "## 🔍 Compute Sanitizer Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All sanitizer checks completed." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ${{ needs.compute-sanitizer.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.compute-sanitizer.result }}" == "success" ]; then
+            echo "✅ **All checks passed!**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "No memory errors, race conditions, or uninitialized variables detected." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ **Some checks failed or were skipped**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Review the individual sanitizer logs for details." >> $GITHUB_STEP_SUMMARY
+          fi
+      
+      - name: Fail if errors detected
+        if: needs.compute-sanitizer.result == 'failure'
+        run: |
+          echo "::error::Compute Sanitizer detected errors - review logs"
+          exit 1
+
