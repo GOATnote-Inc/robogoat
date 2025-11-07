@@ -11,6 +11,8 @@ on:
   push:
     tags:
       - 'v*.*.*'
+    branches-ignore:
+      - '**'  # Explicitly ignore all branches (only trigger on tags)
   workflow_dispatch:
     inputs:
       dry_run:
