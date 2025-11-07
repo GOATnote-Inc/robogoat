@@ -28,8 +28,9 @@ jobs:
       
       - name: Generate SBOM (CycloneDX)
         run: |
-          cyclonedx-py requirements -o sbom.json
-          cyclonedx-py environment -o sbom-env.json
+          cd robocache
+          pip install -e .
+          cyclonedx-py environment -o ../sbom.json
       
       - name: Upload SBOM
         uses: actions/upload-artifact@v4
@@ -57,7 +58,9 @@ jobs:
       
       - name: Run pip-audit
         run: |
-          pip-audit --desc --format json --output audit-report.json || true
+          cd robocache
+          pip install -e .
+          pip-audit --desc --format json --output ../audit-report.json || true
           pip-audit --desc || true
       
       - name: Run Trivy (filesystem)
