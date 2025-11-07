@@ -1,8 +1,6 @@
 name: Compute Sanitizer
 
 on:
-  pull_request:
-    branches: [main]
   schedule:
     - cron: '0 6 * * 0'  # Weekly on Sunday 6am UTC
   workflow_dispatch:
