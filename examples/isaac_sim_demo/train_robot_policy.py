@@ -131,7 +131,7 @@ class BaselinePreprocessor(nn.Module):
         voxel_flat = voxel_grid.flatten(start_dim=1)
         
         # For demonstration, just use mean of voxel grid
-        voxel_summary = voxel_grid.mean(dim=[1, 2, 3]).unsqueeze(1).expand(-1, fused.shape[1], -1)
+        voxel_summary = voxel_grid.mean(dim=[1, 2, 3]).unsqueeze(1).unsqueeze(2).expand(-1, fused.shape[1], -1)
         
         return torch.cat([fused, voxel_summary], dim=-1)
     
