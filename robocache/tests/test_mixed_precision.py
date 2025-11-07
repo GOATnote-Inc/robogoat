@@ -60,13 +60,13 @@ def test_voxelization_fp32_accuracy():
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA required")
-def test_dtype_promotion():
-    """Verify dtype promotion rules"""
+def test_dtype_consistency():
+    """Verify that all streams must have matching dtypes"""
     import robocache
     
     batch = 2
     
-    # Mixed dtypes should work
+    # Mixed dtypes should fail gracefully
     vision = torch.randn(batch, 30, 512, dtype=torch.float16, device='cuda')
     vision_times = torch.linspace(0, 1, 30, device='cuda').expand(batch, -1)
     proprio = torch.randn(batch, 100, 64, dtype=torch.bfloat16, device='cuda')
@@ -75,10 +75,20 @@ def test_dtype_promotion():
     imu_times = torch.linspace(0, 1, 200, device='cuda').expand(batch, -1)
     target = torch.linspace(0, 1, 50, device='cuda').expand(batch, -1)
     
+    # Should raise error for mixed dtypes
+    with pytest.raises(RuntimeError, match="dtypes must match"):
+        robocache.fuse_multimodal(
+            vision, vision_times, proprio, proprio_times, imu, imu_times, target
+        )
+    
+    # Consistent dtypes should work
+    vision = vision.to(torch.float32)
+    proprio = proprio.to(torch.float32)
+    imu = imu.to(torch.float32)
+    
     out = robocache.fuse_multimodal(
         vision, vision_times, proprio, proprio_times, imu, imu_times, target
     )
     
-    # Output should be highest precision input (fp32)
     assert out.dtype == torch.float32, f"Expected fp32, got {out.dtype}"
 
