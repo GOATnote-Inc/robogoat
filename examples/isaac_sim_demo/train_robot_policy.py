@@ -124,7 +124,8 @@ class BaselinePreprocessor(nn.Module):
         
         # Voxelize point cloud (extremely slow on CPU/PyTorch)
         # Simplified version - real implementation would be even slower
-        voxel_grid = self._voxelize_pytorch(obs['points'])
+        batch_size = fused.shape[0]
+        voxel_grid = self._voxelize_pytorch(obs['points'], batch_size=batch_size)
         
         # Flatten voxel grid and concatenate with fused features
         voxel_flat = voxel_grid.flatten(start_dim=1)
@@ -134,9 +135,8 @@ class BaselinePreprocessor(nn.Module):
         
         return torch.cat([fused, voxel_summary], dim=-1)
     
-    def _voxelize_pytorch(self, points: torch.Tensor) -> torch.Tensor:
+    def _voxelize_pytorch(self, points: torch.Tensor, batch_size: int = 1) -> torch.Tensor:
         """Naive PyTorch voxelization (very slow)"""
-        batch_size = 1  # Assume single batch for simplicity
         grid_size = 64  # Reduced for speed
         
         # Quantize points to grid
@@ -147,9 +147,10 @@ class BaselinePreprocessor(nn.Module):
         grid = torch.zeros(batch_size, grid_size, grid_size, grid_size, device=points.device)
         
         # This is extremely inefficient but representative of baseline
-        for i in range(min(10000, points.shape[0])):  # Sample for speed
-            x, y, z = points_quantized[i]
-            grid[0, x, y, z] = 1.0
+        for b in range(batch_size):
+            for i in range(min(10000, points.shape[0])):  # Sample for speed
+                x, y, z = points_quantized[i]
+                grid[b, x, y, z] = 1.0
         
         return grid
 
