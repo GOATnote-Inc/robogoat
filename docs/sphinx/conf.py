@@ -1,37 +1,47 @@
-# Configuration file for the Sphinx documentation builder.
-# RoboCache API Documentation
+# Configuration file for Sphinx documentation
 
 import os
 import sys
-from pathlib import Path
+sys.path.insert(0, os.path.abspath('../../robocache/python'))
 
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / 'robocache' / 'python'))
-
-# -- Project information -----------------------------------------------------
+# Project information
 project = 'RoboCache'
-copyright = '2025, GOATnote Inc'
-author = 'Brandon Dent'
-version = '1.0.0'
+copyright = '2025, GOATnote Engineering'
+author = 'GOATnote Engineering'
 release = '1.0.0'
 
-# -- General configuration ---------------------------------------------------
+# General configuration
 extensions = [
     'sphinx.ext.autodoc',
-    'sphinx.ext.autosummary',
     'sphinx.ext.napoleon',
     'sphinx.ext.viewcode',
     'sphinx.ext.intersphinx',
-    'sphinx.ext.todo',
-    'sphinx.ext.coverage',
     'sphinx.ext.mathjax',
-    'sphinx_autodoc_typehints',
-    'sphinx_rtd_theme',
+    'myst_parser',
 ]
 
-# Napoleon settings (Google/NumPy style docstrings)
+templates_path = ['_templates']
+exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
+
+# HTML output
+html_theme = 'sphinx_rtd_theme'
+html_static_path = ['_static']
+html_logo = None
+html_theme_options = {
+    'logo_only': False,
+    'display_version': True,
+    'prev_next_buttons_location': 'bottom',
+    'style_external_links': False,
+    'collapse_navigation': False,
+    'sticky_navigation': True,
+    'navigation_depth': 4,
+    'includehidden': True,
+    'titles_only': False
+}
+
+# Napoleon settings (Google/NumPy docstring parsing)
 napoleon_google_docstring = True
-napoleon_numpy_docstring = False
+napoleon_numpy_docstring = True
 napoleon_include_init_with_doc = True
 napoleon_include_private_with_doc = False
 napoleon_include_special_with_doc = True
@@ -41,7 +51,9 @@ napoleon_use_admonition_for_references = True
 napoleon_use_ivar = False
 napoleon_use_param = True
 napoleon_use_rtype = True
+napoleon_preprocess_types = False
 napoleon_type_aliases = None
+napoleon_attr_annotations = True
 
 # Autodoc settings
 autodoc_default_options = {
@@ -51,84 +63,17 @@ autodoc_default_options = {
     'undoc-members': True,
     'exclude-members': '__weakref__'
 }
-autodoc_typehints = 'description'
-autodoc_typehints_description_target = 'documented'
 
-# Autosummary settings
-autosummary_generate = True
-autosummary_generate_overwrite = True
-
-# Intersphinx mapping
+# Intersphinx
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3', None),
     'torch': ('https://pytorch.org/docs/stable/', None),
     'numpy': ('https://numpy.org/doc/stable/', None),
 }
 
-# Templates path
-templates_path = ['_templates']
-
-# List of patterns to ignore
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
-
-# -- Options for HTML output -------------------------------------------------
-html_theme = 'sphinx_rtd_theme'
-html_theme_options = {
-    'canonical_url': 'https://github.com/GOATnote-Inc/robogoat',
-    'logo_only': False,
-    'display_version': True,
-    'prev_next_buttons_location': 'bottom',
-    'style_external_links': True,
-    'collapse_navigation': False,
-    'sticky_navigation': True,
-    'navigation_depth': 4,
-    'includehidden': True,
-    'titles_only': False
-}
-
-html_static_path = ['_static']
-html_logo = None
-html_favicon = None
-
-html_context = {
-    'display_github': True,
-    'github_user': 'GOATnote-Inc',
-    'github_repo': 'robogoat',
-    'github_version': 'main',
-    'conf_py_path': '/docs/sphinx/',
-}
-
-# -- Options for LaTeX output ------------------------------------------------
-latex_elements = {
-    'papersize': 'letterpaper',
-    'pointsize': '10pt',
-    'preamble': '',
-    'figure_align': 'htbp',
-}
-
-latex_documents = [
-    ('index', 'RoboCache.tex', 'RoboCache Documentation',
-     'Brandon Dent', 'manual'),
+# MyST (Markdown) settings
+myst_enable_extensions = [
+    "colon_fence",
+    "deflist",
+    "tasklist",
 ]
-
-# -- Options for manual page output ------------------------------------------
-man_pages = [
-    ('index', 'robocache', 'RoboCache Documentation',
-     [author], 1)
-]
-
-# -- Options for Texinfo output ----------------------------------------------
-texinfo_documents = [
-    ('index', 'RoboCache', 'RoboCache Documentation',
-     author, 'RoboCache', 'GPU-Accelerated Data Engine for Robot Foundation Models',
-     'Miscellaneous'),
-]
-
-# -- Extension configuration -------------------------------------------------
-
-# Todo extension
-todo_include_todos = True
-
-# Coverage extension
-coverage_show_missing_items = True
-
