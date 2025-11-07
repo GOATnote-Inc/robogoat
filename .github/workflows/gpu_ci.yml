@@ -1,0 +1,64 @@
+name: GPU CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  gpu-test:
+    name: GPU Tests (H100/A100)
+    runs-on: [self-hosted, gpu]
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Verify environment
+        run: |
+          cd robocache
+          bash scripts/verify_env.sh
+      
+      - name: Install dependencies
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cu121
+          pip install pytest numpy
+      
+      - name: Build RoboCache
+        working-directory: ./robocache
+        run: |
+          python3 setup.py develop
+      
+      - name: Run unit tests
+        working-directory: ./robocache
+        run: |
+          pytest tests/test_*_correctness.py -v
+      
+      - name: Run performance tests
+        working-directory: ./robocache
+        run: |
+          pytest tests/perf/test_*_perf.py -v
+      
+      - name: Smoke test (performance gates)
+        run: |
+          cd benchmarks
+          python3 smoke.py
+      
+      - name: Full benchmark suite
+        run: |
+          cd benchmarks
+          python3 harness.py --device cuda --output-dir ../bench_results
+      
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench_results_${{ github.sha }}
+          path: bench_results/
+          retention-days: 90
+

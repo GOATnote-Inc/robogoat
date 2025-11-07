@@ -1,5 +1,10 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel", "torch>=2.0.0"]
+requires = [
+    "setuptools>=61.0",
+    "wheel",
+    "torch>=2.0.0",
+    "ninja",
+]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,42 +12,24 @@ name = "robocache"
 version = "1.0.0"
 description = "GPU-Accelerated Data Engine for Robot Foundation Models"
 readme = "README.md"
-requires-python = ">=3.10"
-license = {text = "Apache-2.0"}
+requires-python = ">=3.8"
+license = {text = "MIT"}
 authors = [
-    {name = "GOATnote Inc", email = "b@thegoatnote.com"}
-]
-maintainers = [
-    {name = "Brandon Dent", email = "b@thegoatnote.com"}
-]
-keywords = [
-    "cuda",
-    "gpu",
-    "robotics",
-    "foundation-models",
-    "dataloader",
-    "pytorch",
-    "h100",
-    "a100",
-    "machine-learning",
-    "deep-learning",
+    {name = "GOATnote Engineering", email = "b@thegoatnote.com"}
 ]
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
-    "Intended Audience :: Science/Research",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: Apache Software License",
-    "Operating System :: POSIX :: Linux",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: C++",
     "Programming Language :: CUDA",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
-    "Topic :: Scientific/Engineering :: Robotics",
-    "Topic :: Software Development :: Libraries :: Python Modules",
-    "Topic :: System :: Hardware :: Symmetric Multi-processing",
 ]
 dependencies = [
     "torch>=2.0.0",
@@ -52,90 +39,40 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
-    "pytest-benchmark>=4.0.0",
-    "black>=23.0.0",
-    "isort>=5.12.0",
-    "mypy>=1.0.0",
-    "pre-commit>=3.0.0",
+    "black>=22.0.0",
+    "isort>=5.10.0",
+    "mypy>=0.950",
 ]
-profile = [
-    "nvidia-pyindex",
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov>=3.0.0",
 ]
-docs = [
-    "sphinx>=6.0.0",
-    "sphinx-rtd-theme>=1.2.0",
-    "sphinx-autodoc-typehints>=1.23.0",
+benchmark = [
+    "matplotlib>=3.5.0",
+    "pandas>=1.4.0",
 ]
 
 [project.urls]
 Homepage = "https://github.com/GOATnote-Inc/robogoat"
-Documentation = "https://github.com/GOATnote-Inc/robogoat/tree/main/docs"
 Repository = "https://github.com/GOATnote-Inc/robogoat"
-"Bug Tracker" = "https://github.com/GOATnote-Inc/robogoat/issues"
-Changelog = "https://github.com/GOATnote-Inc/robogoat/blob/main/CHANGELOG.md"
+Documentation = "https://github.com/GOATnote-Inc/robogoat/tree/main/docs"
 
-[tool.setuptools]
-packages = ["robocache"]
-package-dir = {"" = "python"}
+[tool.setuptools.packages.find]
+where = ["python"]
 
 [tool.setuptools.package-data]
-robocache = ["py.typed"]
+robocache = ["*.so", "*.pyd"]
 
-# Black formatting
 [tool.black]
 line-length = 100
-target-version = ["py310", "py311"]
-include = '\.pyi?$'
-extend-exclude = '''
-/(
-  \.eggs
-  | \.git
-  | \.mypy_cache
-  | \.pytest_cache
-  | \.venv
-  | build
-  | dist
-)/
-'''
+target-version = ['py38', 'py39', 'py310', 'py311']
 
-# isort import sorting
 [tool.isort]
 profile = "black"
 line_length = 100
-skip_gitignore = true
-known_first_party = ["robocache"]
 
-# mypy type checking
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.8"
 warn_return_any = true
 warn_unused_configs = true
-disallow_untyped_defs = false  # Allow for now (gradual typing)
-ignore_missing_imports = true
-
-# pytest configuration
-[tool.pytest.ini_options]
-minversion = "7.0"
-addopts = "-ra -q --strict-markers"
-testpaths = ["tests"]
-markers = [
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-    "cuda: marks tests requiring CUDA",
-    "h100: marks tests requiring H100",
-    "a100: marks tests requiring A100",
-]
-
-# Bandit security
-[tool.bandit]
-exclude_dirs = ["tests", "build", "dist"]
-skips = ["B101"]  # Allow assert in tests
-
-# Coverage
-[tool.coverage.run]
-source = ["robocache"]
-omit = ["*/tests/*", "*/test_*.py"]
-
-[tool.coverage.report]
-precision = 2
-show_missing = true
-skip_covered = false
+disallow_untyped_defs = true
