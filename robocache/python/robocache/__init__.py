@@ -42,7 +42,8 @@ def resample_trajectories(
     source_data: torch.Tensor,
     source_times: torch.Tensor,
     target_times: torch.Tensor,
-    device: Optional[str] = None
+    device: Optional[str] = None,
+    backend: Optional[str] = None
 ) -> torch.Tensor:
     """
     Resample trajectory data from source to target timestamps.
@@ -78,7 +79,22 @@ def resample_trajectories(
     source_times = source_times.to(device)
     target_times = target_times.to(device)
     
-    # Use CUDA kernel if available and on CUDA device
+    # Force specific backend if requested
+    if backend == "cuda":
+        if not _cuda_available:
+            raise RuntimeError(
+                "CUDA backend requested but RoboCache CUDA kernels not available. "
+                "Ensure CUDA extension was compiled successfully."
+            )
+        if not source_data.is_cuda:
+            raise RuntimeError("CUDA backend requested but tensors are on CPU")
+        return _cuda_ops.resample_trajectories_cuda(
+            source_data, source_times, target_times
+        )
+    elif backend == "pytorch":
+        return _resample_pytorch(source_data, source_times, target_times)
+    
+    # Auto-select: Use CUDA kernel if available and on CUDA device
     if _cuda_available and source_data.is_cuda:
         return _cuda_ops.resample_trajectories_cuda(
             source_data, source_times, target_times
