@@ -1,27 +1,29 @@
-"""
-RoboCache: GPU-Accelerated Data Engine for Robot Learning
-Optimized for NVIDIA H100 (Hopper, SM90)
-"""
+"""Public Python API for the open-source RoboCache reference package."""
 
 __version__ = "0.1.0"
 
+import warnings
+from typing import Literal, Optional
+
 import torch
-from typing import Optional, Literal
 
-# Lazy import CUDA extension to avoid import-time JIT
-_cuda_module = None
 
-def _get_cuda_ext():
-    """Lazy load CUDA extension"""
-    global _cuda_module
-    if _cuda_module is None:
-        try:
-            from . import _cuda_ext
-            _cuda_module = _cuda_ext.get_cuda_module()
-        except Exception as e:
-            print(f"Warning: CUDA extension unavailable: {e}")
-            _cuda_module = False
-    return _cuda_module if _cuda_module else None
+_CUDA_MESSAGE = (
+    "CUDA kernels are not distributed in the open-source build. "
+    "Install the enterprise wheel to access GPU-accelerated backends."
+)
+
+
+def _resolve_backend(backend: Optional[str]) -> Literal["pytorch"]:
+    """Return the only supported backend and surface CUDA requests clearly."""
+
+    if backend is None or backend == "pytorch":
+        return "pytorch"
+
+    if backend == "cuda":
+        raise NotImplementedError(_CUDA_MESSAGE)
+
+    raise ValueError(f"Unsupported backend '{backend}'. Expected 'pytorch'.")
 
 def resample_trajectories(
     source_data: torch.Tensor,
@@ -50,30 +52,14 @@ def resample_trajectories(
     assert source_times.shape == (B, S), f"source_times shape mismatch"
     assert target_times.shape[0] == B, f"target_times batch mismatch"
     
-    # Backend selection
-    if backend is None:
-        backend = "cuda" if source_data.is_cuda and _get_cuda_ext() else "pytorch"
-    
-    if backend == "cuda":
-        cuda_ext = _get_cuda_ext()
-        if cuda_ext is None:
-            print("Warning: CUDA backend requested but unavailable, falling back to PyTorch")
-            backend = "pytorch"
-        else:
-            # CUDA path
-            src = source_data.contiguous()
-            st = source_times.contiguous()
-            tt = target_times.contiguous()
-            
-            # Convert to BF16 if needed
-            if src.dtype == torch.float32:
-                src = src.to(torch.bfloat16)
-                out = cuda_ext.resample_trajectories_optimized(src, st, tt)
-                return out.to(torch.float32)
-            else:
-                return cuda_ext.resample_trajectories_optimized(src, st, tt)
-    
-    # PyTorch fallback
+    backend = _resolve_backend(backend)
+
+    if source_data.is_cuda:
+        warnings.warn(
+            "RoboCache currently executes the PyTorch reference implementation even on CUDA tensors.",
+            RuntimeWarning,
+        )
+
     return _resample_pytorch(source_data, source_times, target_times)
 
 def _resample_pytorch(source_data, source_times, target_times):
@@ -134,19 +120,47 @@ def voxelize_point_cloud(
     if origin is None:
         origin = torch.zeros(3, device=points.device)
     
-    # PyTorch fallback (CUDA not implemented in public API yet)
+    warnings.warn(
+        "voxelize_point_cloud is deprecated in favour of voxelize_occupancy and "
+        "currently executes the PyTorch reference implementation only.",
+        DeprecationWarning,
+    )
+
+    return voxelize_occupancy(
+        points=points,
+        grid_size=grid_size,
+        voxel_size=voxel_size,
+        origin=origin,
+        backend=backend,
+    )
+
+
+def voxelize_occupancy(
+    points: torch.Tensor,
+    grid_size: tuple,
+    voxel_size: float,
+    origin: Optional[torch.Tensor] = None,
+    backend: Optional[Literal["cuda", "pytorch"]] = None,
+) -> torch.Tensor:
+    """Voxelize a point cloud into a binary occupancy grid using PyTorch."""
+
+    _resolve_backend(backend)
+
+    if origin is None:
+        origin = torch.zeros(3, device=points.device)
+
     X, Y, Z = grid_size
     grid = torch.zeros(X, Y, Z, device=points.device)
-    
+
     for i in range(points.shape[0]):
         p = points[i]
         x = int((p[0] - origin[0]) / voxel_size)
         y = int((p[1] - origin[1]) / voxel_size)
         z = int((p[2] - origin[2]) / voxel_size)
-        
+
         if 0 <= x < X and 0 <= y < Y and 0 <= z < Z:
             grid[x, y, z] = 1.0
-    
+
     return grid
 
 def fuse_multimodal(
@@ -176,6 +190,8 @@ def fuse_multimodal(
         [B, T, Dv+Dp+Df] fused features
     """
     # Resample each modality independently
+    backend = _resolve_backend(backend)
+
     v_aligned = resample_trajectories(vision_data, vision_times, target_times, backend)
     p_aligned = resample_trajectories(proprio_data, proprio_times, target_times, backend)
     f_aligned = resample_trajectories(force_data, force_times, target_times, backend)
@@ -186,5 +202,6 @@ def fuse_multimodal(
 __all__ = [
     "resample_trajectories",
     "voxelize_point_cloud",
+    "voxelize_occupancy",
     "fuse_multimodal",
 ]

@@ -1,10 +1,10 @@
 # RoboCache
 
-**GPU-Accelerated Data Engine for Embodied AI Foundation Models**
+**PyTorch Reference Data Engine for Embodied AI Foundation Models**
 
-**Production-grade GPU data engine for NVIDIA H100 / A100 / B100 robot foundation models.**
+> ⚠️ **Open-source scope:** This repository ships the PyTorch reference implementations only. CUDA kernels, CUTLASS bindings, and associated profiling tooling remain part of NVIDIA's enterprise distribution and are not included here.
 
-RoboCache eliminates data preprocessing as the bottleneck in robot learning. Optimized for NVIDIA H100 / A100 / Blackwell using CUDA 13.0 + CUTLASS 4.3.0 (Oct 2025 release: Python DSL, CuTe debugging, SM100/SM120 support), with PyTorch 2.10 custom ops backend. NCU-validated performance on H100: 25,600 trajectories/sec (0.02ms latency), 2.9B points/sec voxelization, 92-95% end-to-end GPU utilization.
+RoboCache eliminates data preprocessing as the bottleneck in robot learning by providing numerically stable, well-tested PyTorch operators for trajectory resampling, multimodal fusion, and point-cloud voxelization. The CPU/GPU (PyTorch) paths available in this repository match the public Python API that production deployments use, enabling experimentation and unit testing without proprietary CUDA extensions.
 
 **⚡ [Quick Start](QUICK_START_BENCHMARK.md)** | **📊 [Benchmarks](BENCHMARK_RESULTS_H100.md)** | **🗺️ [Roadmap](STRATEGIC_ROADMAP.md)** | **📈 [Status](PROJECT_STATUS.md)** | **⚠️ [Known Limitations](KNOWN_LIMITATIONS.md)**
 
@@ -17,16 +17,19 @@ RoboCache eliminates data preprocessing as the bottleneck in robot learning. Opt
 
 **🛡️ [Security Policy](SECURITY.md)** | **🤝 [Contributing](CONTRIBUTING.md)** | **📜 [Code of Conduct](CODE_OF_CONDUCT.md)** | **📖 [Citation](CITATION.cff)**
 
-## 🚀 Key Features (v0.2.1)
+## 🚀 Key Features (Open-Source Build)
 
-- **3 Production Operations**: Trajectory resampling, multimodal fusion, voxelization
-- **CUDA-Accelerated**: All operations have CUDA backend support (H100 validated)
-- **PyTorch Fallback**: Works on CPU/GPU without CUDA compilation
-- **Simple Python API**: Clean interface with automatic backend selection
-- **H100 Validated**: 0.02ms trajectory, 0.01ms voxelization (2.9B points/sec)
-- **Comprehensive Tests**: All operations tested on H100
-- **Multi-Backend**: CUDA primary, PyTorch for compatibility
-- **Easy Installation**: JIT compilation (wheels in development)
+- **Three reference operations**: Trajectory resampling, multimodal fusion, and occupancy voxelization implemented in PyTorch
+- **Backend parity checks**: A shared API across research and production builds; CUDA backends raise a clear `NotImplementedError` in the open-source distribution
+- **Deterministic CPU behaviour**: Stable numerical outputs across runs for reproducible research
+- **Simple Python API**: Consistent signatures for enterprise/private builds and this public reference
+- **Integration smoke tests**: Import-level tests validate that the packaged interface works as expected without wheels
+
+## 📦 Editions at a Glance
+
+- **Open-source reference (this repo):** PyTorch-only implementations with explicit errors when CUDA backends are requested.
+- **Enterprise GPU build:** Includes CUTLASS/CUDA kernels, Nsight profiles, and deployment automation. References to CUDA
+  performance throughout this README describe the enterprise release for transparency.
 
 ## 💡 The Problem
 
@@ -41,51 +44,33 @@ Training robot foundation models (like NVIDIA's GR00T) on heterogeneous datasets
 
 ## 🎯 The Solution
 
-RoboCache provides GPU-accelerated data operations optimized for embodied AI:
+RoboCache provides reference data operations for embodied AI:
 
 ### Phase 1: Trajectory Resampling ✅
 
-Convert variable-frequency robot trajectories to uniform sampling rate using GPU-accelerated linear interpolation.
-
-**Performance** (H100, batch=32, source_len=50, target_len=256, dim=128):
-
-| Backend | Latency | Throughput | Status |
-|---------|---------|------------|--------|
-| **CUDA** | **0.02ms** | **512M samples/sec** | ✅ Production |
-| PyTorch | ~2-3ms | ~50M samples/sec | ✅ Fallback |
-
-**H100 Validation:** NCU profiled, 82-99.7% SM utilization (scale-dependent)  
-**Optimizations:** Shared memory caching, vectorized BF16, binary search, L1-resident for small batches
+Convert variable-frequency robot trajectories to a uniform sampling rate using a numerically stable PyTorch implementation.
+Enterprise wheels include CUDA kernels tuned for Hopper, but they are outside the scope of this repository.
 
 **API:**
 ```python
 import torch
 import robocache
 
-# Autotuned backend: CUDA 13.0 kernel first; TorchInductor fallback if unavailable
-resampled = robocache.resample_trajectories(data, src_times, tgt_times)
+# PyTorch reference backend (available in open-source build)
+resampled = robocache.resample_trajectories(data, src_times, tgt_times, backend="pytorch")
 
-# PyTorch reference (CPU/GPU): slower, but works everywhere
-resampled_torch = torch.nn.functional.interpolate(...)  # example fallback
+# Enterprise builds auto-select CUDA when the kernels are available
+# resampled = robocache.resample_trajectories(data, src_times, tgt_times)
 ```
 
-**CUDA optimizations:**
-- BF16 precision (2x less memory traffic)
-- Memory-bandwidth optimized (NCU validated)
-- H100-specific tuning
+> **CUDA note:** Requesting `backend="cuda"` raises a `NotImplementedError` in the open-source build so that downstream
+> applications can fail fast when GPU kernels are unavailable. The enterprise wheel routes the same API to optimised CUDA
+> implementations with BF16 vectorisation and Hopper-specific tuning.
 
 ### Phase 2: Multimodal Sensor Fusion ✅
 
-Align and fuse multiple sensor streams sampled at different frequencies.
-
-**Performance** (H100):
-
-| Backend | Implementation | Status |
-|---------|----------------|--------|
-| **CUDA** | **3x trajectory kernel** | ✅ Production |
-| PyTorch | 3x resample + concat | ✅ Fallback |
-
-**Note:** Currently uses trajectory resampling kernel 3x (once per modality). Fused kernel available but not yet exposed in Python API.
+Align and fuse multiple sensor streams sampled at different frequencies. The PyTorch reference backend performs three resampling
+passes followed by concatenation. An optimised CUDA fusion kernel exists internally but is not part of this repository.
 
 **API:**
 ```python
@@ -108,48 +93,23 @@ fused = robocache.fuse_multimodal(
 
 **Key benefits:**
 - ✅ **Single API call**: Aligns + concatenates in one operation
-- ✅ **GPU-accelerated**: Uses CUDA trajectory kernel (3x faster than sequential)
-- ✅ **Multi-backend**: CUDA for speed, PyTorch for compatibility
-- ✅ **Batch efficient**: Scales to 256+ batch sizes
+- ⚠️ **Enterprise only**: GPU fusion kernel (3× faster) ships with the private CUDA build
+- ⚠️ **Enterprise only**: Automatic CUDA/PyTorch backend selection is available in the enterprise wheel
+- ✅ **Batch efficient**: Scales to 256+ batch sizes using the shared PyTorch implementation
 
 ### Phase 3: Point Cloud Voxelization ✅
 
-Convert 3D point clouds to voxel grids for neural network processing.
-
-**Performance** (H100, validated):
-
-| Configuration | CUDA Latency | Throughput | Use Case |
-|---------------|--------------|------------|----------|
-| **10K points, 64³ grid** | **0.01ms** | **2.9B points/sec** | Real-time 🏆 |
-| **Larger grids** | Scales linearly | - | High resolution |
-
-**API:**
-```python
-import robocache
-
-# Convert point cloud to binary occupancy grid
-voxel_grid = robocache.voxelize_occupancy(
-    points,      # [batch, num_points, 3]
-    grid_size,   # [depth, height, width]
-    voxel_size,  # meters per voxel
-    origin       # [x, y, z] grid origin
-)
-# Output: [batch, depth, height, width]
-
-# Auto-selects CUDA, or use backend='pytorch' for fallback
-```
-
-**Key features:**
-- ✅ **Deterministic**: CPU/GPU produce identical results
-- ✅ **Production-grade**: Atomic operations, error handling
-- ✅ **Fast**: 2.9 billion points/sec on H100
-- ✅ **H100 validated**: NCU profiled, 94.93% SM utilization (count pass)
+Convert 3D point clouds to voxel grids for neural network processing. The public API now exposes `voxelize_occupancy`, implemented
+in PyTorch. CUDA implementations for occupancy, density, and feature pooling ship exclusively with the enterprise wheel.
 
 ## 📦 Installation
 
 ### Requirements
 
-**For Production (CUDA backend - GPU-accelerated):**
+> The steps below outline the enterprise GPU workflow for completeness. The open-source reference build only requires the
+> PyTorch-only instructions.
+
+**For Production (CUDA backend - GPU-accelerated, enterprise build):**
 - **CUDA**: 13.0+ (12.1+ also supported)
 - **PyTorch**: 2.0+ with CUDA support
 - **CMake**: 3.18+
@@ -158,7 +118,7 @@ voxel_grid = robocache.voxelize_occupancy(
 **For Development/Testing (PyTorch fallback - slower):**
 - **PyTorch**: 2.0+ (CPU or GPU)
 
-### Quick Start (Full Installation)
+### Quick Start (Full Installation - Enterprise build)
 
 ```bash
 # 1. Install CUTLASS 4.3.0 (main branch, Oct 2025 release)
@@ -205,6 +165,9 @@ robocache.print_installation_info()
 
 ## 🔥 Quick Example
 
+> The following example illustrates the enterprise GPU build. When using the open-source reference package, move tensors to CPU
+> and pass `backend="pytorch"` explicitly.
+
 ```python
 import torch
 import robocache
@@ -223,6 +186,8 @@ print(resampled.shape)  # torch.Size([64, 50, 32])
 ```
 
 ### Multimodal Fusion Example (Phase 2)
+
+> Enterprise-only CUDA example. Use CPU tensors and `backend="pytorch"` with the open-source package.
 
 ```python
 import torch
