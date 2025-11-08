@@ -26,16 +26,15 @@ setup(
     description="GPU-Accelerated Data Engine for Robot Learning",
     long_description=readme,
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/robocache",
+    url="https://github.com/robocache/robocache",
     project_urls={
-        "Bug Tracker": "https://github.com/yourusername/robocache/issues",
-        "Documentation": "https://github.com/yourusername/robocache#readme",
-        "Source Code": "https://github.com/yourusername/robocache",
+        "Bug Tracker": "https://github.com/robocache/robocache/issues",
+        "Documentation": "https://github.com/robocache/robocache#readme",
+        "Source Code": "https://github.com/robocache/robocache",
     },
-    packages=find_packages(where="python") + find_packages(where="robocache"),
+    packages=find_packages(where="python"),
     package_dir={
         "": "python",
-        "robocache.datasets": "robocache/datasets",
     },
     python_requires=">=3.8",
     install_requires=[
