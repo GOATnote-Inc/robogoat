@@ -1,0 +1,82 @@
+name: GPU CI - H100
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'robocache/**/*.cu'
+      - 'robocache/**/*.cpp'
+      - 'robocache/**/*.py'
+      - 'robocache/setup.py'
+      - 'robocache/cpp/CMakeLists.txt'
+      - '.github/workflows/gpu_ci_h100.yml'
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-and-test-h100:
+    name: H100 SM90 Validation
+    runs-on: self-hosted
+    labels: [h100, gpu]
+    
+    env:
+      CUDA_VISIBLE_DEVICES: 0
+      TORCH_CUDA_ARCH_LIST: "9.0"
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: System Info
+        run: |
+          nvidia-smi
+          nvcc --version
+          python3 --version
+          echo "CUDA_HOME: $CUDA_HOME"
+      
+      - name: Setup Python environment
+        run: |
+          cd /workspace/robocache
+          export LD_LIBRARY_PATH=$(python3 -c "import torch, os; print(os.path.join(os.path.dirname(torch.__file__), 'lib'))"):$LD_LIBRARY_PATH
+          pip install -e . --no-build-isolation
+      
+      - name: Verify CUDA kernels loaded
+        run: |
+          cd /workspace
+          python3 -c "import robocache; assert robocache._cuda_available, 'CUDA not available'; print('✅ CUDA kernels loaded')"
+      
+      - name: Run smoke test with thresholds
+        run: |
+          cd /workspace/robocache
+          python3 benchmarks/smoke.py --assert-min-throughput || exit 1
+      
+      - name: Run full benchmark suite
+        run: |
+          cd /workspace/robocache
+          python3 bench/benchmark_harness.py \
+            --output results/ci_h100_$(date +%Y%m%d_%H%M%S).csv \
+            --seeds 3 --repeats 20
+      
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: h100-benchmarks
+          path: /workspace/robocache/results/*.csv
+          retention-days: 30
+      
+      - name: Generate performance report
+        run: |
+          cd /workspace/robocache
+          python3 scripts/generate_profiling_report.py \
+            results/ci_h100_*.csv \
+            artifacts/CI_H100_REPORT.md
+      
+      - name: Check for regressions
+        run: |
+          cd /workspace/robocache
+          python3 scripts/compare_to_baseline.py \
+            results/ci_h100_*.csv \
+            bench/results/benchmark_h100_20251106_172811.csv \
+            --threshold 0.95 || exit 1
+
