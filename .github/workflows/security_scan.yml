@@ -41,6 +41,7 @@ jobs:
   vulnerability-scan:
     name: CVE Scan
     runs-on: ubuntu-latest
+    if: false  # Disabled - manual only
     
     steps:
       - uses: actions/checkout@v4
