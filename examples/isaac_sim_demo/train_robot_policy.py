@@ -37,9 +37,12 @@ from torch.utils.tensorboard import SummaryWriter
 
 try:
     import robocache
+    from robocache.sim_to_real import DomainRandomizer, LatencySimulator
     ROBOCACHE_AVAILABLE = True
 except ImportError:
     ROBOCACHE_AVAILABLE = False
+    DomainRandomizer = None
+    LatencySimulator = None
     print("⚠️  RoboCache not available - install with: pip install robocache")
 
 # Isaac Sim imports (optional - fallback to mock if not available)
@@ -54,8 +57,23 @@ except ImportError:
 class SensorDataGenerator:
     """Simulates robot sensor data (fallback if Isaac Sim not available)"""
     
-    def __init__(self, device: str = 'cuda'):
+    def __init__(self, device: str = 'cuda', use_domain_randomization: bool = False):
         self.device = device
+        self.use_domain_randomization = use_domain_randomization
+        
+        # Initialize domain randomizer for sim-to-real transfer
+        if use_domain_randomization and DomainRandomizer is not None:
+            self.randomizer = DomainRandomizer(
+                lighting_range=(0.7, 1.3),
+                blur_kernel_range=(3, 7),
+                lidar_dropout_prob=0.05,
+                lidar_noise_std=0.02,
+                camera_noise_std=0.05,
+                enable_occlusions=True
+            )
+            print("✅ Domain randomization enabled (sim-to-real transfer)")
+        else:
+            self.randomizer = None
         
     def get_observation(self, batch_size: int = 1) -> Dict[str, torch.Tensor]:
         """Generate synthetic sensor data matching Isaac Sim format"""
@@ -76,6 +94,17 @@ class SensorDataGenerator:
         
         # Point cloud from depth camera (500K points)
         points = torch.rand(500000, 3, device=self.device, dtype=torch.float32) * 4.0 - 2.0
+        
+        # Apply domain randomization for sim-to-real transfer
+        if self.randomizer is not None:
+            vision_aug, points_aug, proprio_aug = self.randomizer(
+                vision=vision.float(),  # Convert to float for augmentation
+                lidar=points,
+                proprio=proprio.float()
+            )
+            vision = vision_aug.to(torch.bfloat16)
+            proprio = proprio_aug.to(torch.bfloat16)
+            points = points_aug
         
         return {
             'vision': vision,
@@ -221,7 +250,11 @@ class Trainer:
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
         # Setup
-        self.sensor_gen = SensorDataGenerator(device=self.device)
+        use_domain_rand = getattr(args, 'domain_randomization', False)
+        self.sensor_gen = SensorDataGenerator(
+            device=self.device,
+            use_domain_randomization=use_domain_rand
+        )
         
         # Preprocessor
         if args.mode == 'robocache':
@@ -394,6 +427,8 @@ def main():
                         help='Training mode: baseline (PyTorch) or robocache (accelerated)')
     parser.add_argument('--steps', type=int, default=10000,
                         help='Number of training steps')
+    parser.add_argument('--domain-randomization', action='store_true',
+                        help='Enable domain randomization for sim-to-real transfer')
     parser.add_argument('--batch-size', type=int, default=32,
                         help='Batch size')
     parser.add_argument('--profile', action='store_true',
