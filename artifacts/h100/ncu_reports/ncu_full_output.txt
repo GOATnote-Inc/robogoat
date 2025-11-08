@@ -1,0 +1,28 @@
+==PROF== Connected to process 1140324 (/usr/bin/python3.10)
+==WARNING== Unable to access the following 6 metrics: ctc__rx_bytes_data_user.sum, ctc__rx_bytes_data_user.sum.pct_of_peak_sustained_elapsed, ctc__rx_bytes_data_user.sum.per_second, ctc__tx_bytes_data_user.sum, ctc__tx_bytes_data_user.sum.pct_of_peak_sustained_elapsed, ctc__tx_bytes_data_user.sum.per_second.
+
+
+==PROF== Profiling "distribution_elementwise_grid..." - 0: 0%....50%....100% - 38 passes
+==PROF== Profiling "vectorized_elementwise_kernel" - 1: 0%....50%....100% - 37 passes
+==PROF== Profiling "vectorized_elementwise_kernel" - 2: 0%....50%....100% - 38 passes
+==PROF== Profiling "vectorized_elementwise_kernel" - 3: 0%....50%....100% - 38 passes
+==PROF== Profiling "voxelize_occupancy_kernel" - 4: 0%....50%....100% - 38 passes
+==PROF== Profiling "distribution_elementwise_grid..." - 5: 0%....50%....100% - 38 passes
+==PROF== Profiling "elementwise_kernel_with_index" - 6: 0%....50%....100% - 38 passes
+==PROF== Profiling "elementwise_kernel_with_index" - 7: 0%....50%....100% - 38 passes
+==PROF== Profiling "resample_trajectory_fp32_kernel" - 8: 0%....50%....100% - 38 passes
+=== RoboCache H100 Comprehensive Profiling ===
+PyTorch: 2.10.0.dev20251101+cu130
+CUDA Available: True
+Device: NVIDIA H100 PCIe
+RoboCache Version: 1.0.0
+
+[1/2] Profiling: voxelize_occupancy_kernel
+  ✓ Voxelization complete
+
+[2/2] Profiling: trajectory_resample_kernel
+  ✓ Trajectory resampling complete
+
+=== Profiling Complete ===
+==PROF== Disconnected from process 1140324
+==PROF== Report: /workspace/robocache/robocache/artifacts/ncu_reports/robocache_h100_full.ncu-rep

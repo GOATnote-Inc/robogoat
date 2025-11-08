@@ -1,0 +1,96 @@
+=== End-to-End RoboCache Benchmark ===
+
+[1/3] Trajectory Resampling (100 iterations)
+  Avg latency: 0.031 ms
+  Throughput: 261.65 M samples/sec
+
+[2/3] Point Cloud Voxelization (100 iterations)
+  Avg latency: 0.030 ms
+  Throughput: 16.86 B points/sec
+
+[3/3] Multimodal Fusion (100 iterations)
+Traceback (most recent call last):
+  File "/tmp/benchmark_e2e.py", line 60, in <module>
+    fused = robocache.fuse_multimodal(
+TypeError: fuse_multimodal() got an unexpected keyword argument 'backend'
+Collecting data...
+Generating '/home/shadeform/tmp/nsys-report-6faf.qdstrm'
+[1/8] [0%                          ] robocache_h100_e2e.nsys-rep[1/8] [0%                          ] robocache_h100_e2e.nsys-rep[1/8] [=16%                        ] robocache_h100_e2e.nsys-rep[1/8] [==18%                       ] robocache_h100_e2e.nsys-rep[1/8] [==20%                       ] robocache_h100_e2e.nsys-rep[1/8] [==21%                       ] robocache_h100_e2e.nsys-rep[1/8] [===22%                      ] robocache_h100_e2e.nsys-rep[1/8] [===23%                      ] robocache_h100_e2e.nsys-rep[1/8] [====25%                     ] robocache_h100_e2e.nsys-rep[1/8] [====26%                     ] robocache_h100_e2e.nsys-rep[1/8] [=====30%                    ] robocache_h100_e2e.nsys-rep[1/8] [=====31%                    ] robocache_h100_e2e.nsys-rep[1/8] [=====32%                    ] robocache_h100_e2e.nsys-rep[1/8] [======33%                   ] robocache_h100_e2e.nsys-rep[1/8] [======34%                   ] robocache_h100_e2e.nsys-rep[1/8] [======35%                   ] robocache_h100_e2e.nsys-rep[1/8] [========41%                 ] robocache_h100_e2e.nsys-rep[1/8] [========42%                 ] robocache_h100_e2e.nsys-rep[1/8] [=============58%            ] robocache_h100_e2e.nsys-rep[1/8] [=============59%            ] robocache_h100_e2e.nsys-rep[1/8] [=============60%            ] robocache_h100_e2e.nsys-rep[1/8] [==============61%           ] robocache_h100_e2e.nsys-rep[1/8] [==============62%           ] robocache_h100_e2e.nsys-rep[1/8] [==============63%           ] robocache_h100_e2e.nsys-rep[1/8] [===============65%          ] robocache_h100_e2e.nsys-rep[1/8] [================68%         ] robocache_h100_e2e.nsys-rep[1/8] [========================100%] robocache_h100_e2e.nsys-rep[1/8] [========================100%] robocache_h100_e2e.nsys-rep
+[2/8] [0%                          ] robocache_h100_e2e.sqlite[2/8] [1%                          ] robocache_h100_e2e.sqlite[2/8] [2%                          ] robocache_h100_e2e.sqlite[2/8] [3%                          ] robocache_h100_e2e.sqlite[2/8] [4%                          ] robocache_h100_e2e.sqlite[2/8] [5%                          ] robocache_h100_e2e.sqlite[2/8] [6%                          ] robocache_h100_e2e.sqlite[2/8] [7%                          ] robocache_h100_e2e.sqlite[2/8] [8%                          ] robocache_h100_e2e.sqlite[2/8] [9%                          ] robocache_h100_e2e.sqlite[2/8] [10%                         ] robocache_h100_e2e.sqlite[2/8] [11%                         ] robocache_h100_e2e.sqlite[2/8] [12%                         ] robocache_h100_e2e.sqlite[2/8] [13%                         ] robocache_h100_e2e.sqlite[2/8] [14%                         ] robocache_h100_e2e.sqlite[2/8] [=15%                        ] robocache_h100_e2e.sqlite[2/8] [=16%                        ] robocache_h100_e2e.sqlite[2/8] [=17%                        ] robocache_h100_e2e.sqlite[2/8] [==18%                       ] robocache_h100_e2e.sqlite[2/8] [==19%                       ] robocache_h100_e2e.sqlite[2/8] [==20%                       ] robocache_h100_e2e.sqlite[2/8] [==21%                       ] robocache_h100_e2e.sqlite[2/8] [===22%                      ] robocache_h100_e2e.sqlite[2/8] [===23%                      ] robocache_h100_e2e.sqlite[2/8] [===24%                      ] robocache_h100_e2e.sqlite[2/8] [====25%                     ] robocache_h100_e2e.sqlite[2/8] [====26%                     ] robocache_h100_e2e.sqlite[2/8] [====27%                     ] robocache_h100_e2e.sqlite[2/8] [====28%                     ] robocache_h100_e2e.sqlite[2/8] [=====29%                    ] robocache_h100_e2e.sqlite[2/8] [=====30%                    ] robocache_h100_e2e.sqlite[2/8] [=====31%                    ] robocache_h100_e2e.sqlite[2/8] [=====32%                    ] robocache_h100_e2e.sqlite[2/8] [======33%                   ] robocache_h100_e2e.sqlite[2/8] [======34%                   ] robocache_h100_e2e.sqlite[2/8] [======35%                   ] robocache_h100_e2e.sqlite[2/8] [=======36%                  ] robocache_h100_e2e.sqlite[2/8] [=======37%                  ] robocache_h100_e2e.sqlite[2/8] [=======38%                  ] robocache_h100_e2e.sqlite[2/8] [=======39%                  ] robocache_h100_e2e.sqlite[2/8] [========40%                 ] robocache_h100_e2e.sqlite[2/8] [========41%                 ] robocache_h100_e2e.sqlite[2/8] [========42%                 ] robocache_h100_e2e.sqlite[2/8] [=========43%                ] robocache_h100_e2e.sqlite[2/8] [=========44%                ] robocache_h100_e2e.sqlite[2/8] [=========45%                ] robocache_h100_e2e.sqlite[2/8] [=========46%                ] robocache_h100_e2e.sqlite[2/8] [==========47%               ] robocache_h100_e2e.sqlite[2/8] [==========48%               ] robocache_h100_e2e.sqlite[2/8] [==========49%               ] robocache_h100_e2e.sqlite[2/8] [===========50%              ] robocache_h100_e2e.sqlite[2/8] [===========51%              ] robocache_h100_e2e.sqlite[2/8] [===========52%              ] robocache_h100_e2e.sqlite[2/8] [===========53%              ] robocache_h100_e2e.sqlite[2/8] [============54%             ] robocache_h100_e2e.sqlite[2/8] [============55%             ] robocache_h100_e2e.sqlite[2/8] [============56%             ] robocache_h100_e2e.sqlite[2/8] [============57%             ] robocache_h100_e2e.sqlite[2/8] [=============58%            ] robocache_h100_e2e.sqlite[2/8] [=============59%            ] robocache_h100_e2e.sqlite[2/8] [=============60%            ] robocache_h100_e2e.sqlite[2/8] [==============61%           ] robocache_h100_e2e.sqlite[2/8] [==============62%           ] robocache_h100_e2e.sqlite[2/8] [==============63%           ] robocache_h100_e2e.sqlite[2/8] [==============64%           ] robocache_h100_e2e.sqlite[2/8] [===============65%          ] robocache_h100_e2e.sqlite[2/8] [===============66%          ] robocache_h100_e2e.sqlite[2/8] [===============67%          ] robocache_h100_e2e.sqlite[2/8] [================68%         ] robocache_h100_e2e.sqlite[2/8] [================69%         ] robocache_h100_e2e.sqlite[2/8] [================70%         ] robocache_h100_e2e.sqlite[2/8] [================71%         ] robocache_h100_e2e.sqlite[2/8] [=================72%        ] robocache_h100_e2e.sqlite[2/8] [=================73%        ] robocache_h100_e2e.sqlite[2/8] [=================74%        ] robocache_h100_e2e.sqlite[2/8] [==================75%       ] robocache_h100_e2e.sqlite[2/8] [==================76%       ] robocache_h100_e2e.sqlite[2/8] [==================77%       ] robocache_h100_e2e.sqlite[2/8] [==================78%       ] robocache_h100_e2e.sqlite[2/8] [===================79%      ] robocache_h100_e2e.sqlite[2/8] [===================80%      ] robocache_h100_e2e.sqlite[2/8] [===================81%      ] robocache_h100_e2e.sqlite[2/8] [===================82%      ] robocache_h100_e2e.sqlite[2/8] [====================83%     ] robocache_h100_e2e.sqlite[2/8] [====================84%     ] robocache_h100_e2e.sqlite[2/8] [====================85%     ] robocache_h100_e2e.sqlite[2/8] [=====================86%    ] robocache_h100_e2e.sqlite[2/8] [=====================87%    ] robocache_h100_e2e.sqlite[2/8] [=====================88%    ] robocache_h100_e2e.sqlite[2/8] [=====================89%    ] robocache_h100_e2e.sqlite[2/8] [======================90%   ] robocache_h100_e2e.sqlite[2/8] [======================91%   ] robocache_h100_e2e.sqlite[2/8] [======================92%   ] robocache_h100_e2e.sqlite[2/8] [=======================93%  ] robocache_h100_e2e.sqlite[2/8] [=======================94%  ] robocache_h100_e2e.sqlite[2/8] [=======================95%  ] robocache_h100_e2e.sqlite[2/8] [=======================96%  ] robocache_h100_e2e.sqlite[2/8] [========================97% ] robocache_h100_e2e.sqlite[2/8] [========================98% ] robocache_h100_e2e.sqlite[2/8] [========================99% ] robocache_h100_e2e.sqlite[2/8] [========================100%] robocache_h100_e2e.sqlite[2/8] [========================100%] robocache_h100_e2e.sqlite
+SKIPPED: /workspace/robocache/robocache/artifacts/nsys_reports/robocache_h100_e2e.sqlite does not contain NV Tools Extension (NVTX) data.
+[3/8] Executing 'nvtx_sum' stats report
+[4/8] Executing 'osrt_sum' stats report
+
+ Time (%)  Total Time (ns)  Num Calls   Avg (ns)    Med (ns)   Min (ns)  Max (ns)   StdDev (ns)           Name         
+ --------  ---------------  ---------  ----------  ----------  --------  ---------  -----------  ----------------------
+     85.8       1080233655         55  19640611.9  10103932.0     59580  295004980   42536715.1  poll                  
+      9.4        117723555        570    206532.6     12023.0      1012   10706032     610603.2  ioctl                 
+      1.3         16688240       6103      2734.4      2433.0      1042      47420       2259.0  stat64                
+      1.1         14471804       8278      1748.2      1613.0      1101      36244       1381.9  lstat64               
+      0.6          7427192       1197      6204.8      1973.0      1002     320561      15583.3  read                  
+      0.4          5486580       1215      4515.7      4166.0      1922      35413       2510.6  open64                
+      0.4          5092220          1   5092220.0   5092220.0   5092220    5092220          0.0  nanosleep             
+      0.3          3929564         78     50379.0      8242.0      3296    2582720     292615.4  mmap64                
+      0.2          2177195         29     75075.7     74682.0     65959      85378       4781.5  sleep                 
+      0.1          1258967         11    114451.5     76635.0     56644     503774     129761.7  sem_timedwait         
+      0.1          1052984         44     23931.5      7866.5      2664     345507      55604.2  mmap                  
+      0.1           821643        596      1378.6      1171.0      1001      39970       2027.7  close                 
+      0.1           761873         32     23808.5     12739.5     12279      91578      24787.8  fgets                 
+      0.0           414664        261      1588.8      1112.0      1001      28082       3032.5  fstat64               
+      0.0           342532         46      7446.3      5108.0      1412      40581       8236.5  fopen                 
+      0.0           263845          1    263845.0    263845.0    263845     263845          0.0  pthread_cond_wait     
+      0.0           243213          2    121606.5    121606.5    121511     121702        135.1  pthread_create        
+      0.0           121630         16      7601.9      6790.0      1142      18087       3539.9  write                 
+      0.0           108232          6     18038.7     20546.0      4757      25468       8025.3  pthread_cond_signal   
+      0.0            99099         21      4719.0      3345.0      2404      19959       3948.0  open                  
+      0.0            91920         43      2137.7      1894.0      1022       6460       1162.8  fclose                
+      0.0            63907          6     10651.2      7742.0      6099      28282       8671.2  munmap                
+      0.0            34460          7      4922.9      2764.0      2453      14532       4357.3  fopen64               
+      0.0            30225          3     10075.0     11988.0      2213      16024       7101.5  fread                 
+      0.0            22324          3      7441.3      9364.0      3516       9444       3399.7  pipe2                 
+      0.0            18868          2      9434.0      9434.0      5007      13861       6260.7  socket                
+      0.0            18357          7      2622.4      2653.0      1503       3875        989.8  stat                  
+      0.0            11467          1     11467.0     11467.0     11467      11467          0.0  connect               
+      0.0             9334          1      9334.0      9334.0      9334       9334          0.0  pthread_cond_broadcast
+      0.0             6379          2      3189.5      3189.5      2314       4065       1238.1  fwrite                
+      0.0             5027          2      2513.5      2513.5      1041       3986       2082.4  getc                  
+      0.0             3856          3      1285.3      SKIPPED: /workspace/robocache/robocache/artifacts/nsys_reports/robocache_h100_e2e.sqlite does not contain GPU memory data.
+SKIPPED: /workspace/robocache/robocache/artifacts/nsys_reports/robocache_h100_e2e.sqlite does not contain GPU memory data.
+1121.0      1102       1633        301.2  fcntl                 
+      0.0             3836          2      1918.0      1918.0      1853       1983         91.9  sigaction             
+      0.0             3585          2      1792.5      1792.5      1702       1883        128.0  fflush                
+      0.0             2644          1      2644.0      2644.0      2644       2644          0.0  bind                  
+      0.0             1042          1      1042.0      1042.0      1042       1042          0.0  fcntl64               
+
+[5/8] Executing 'cuda_api_sum' stats report
+
+ Time (%)  Total Time (ns)  Num Calls  Avg (ns)   Med (ns)   Min (ns)  Max (ns)  StdDev (ns)               Name             
+ --------  ---------------  ---------  ---------  ---------  --------  --------  -----------  ------------------------------
+     53.7         22497972          8  2812246.5  1357810.5     44947   8966236    3183814.2  cuLibraryLoadData             
+     40.0         16770308        343    48893.0     4407.0      2494   5347393     418895.3  cudaLaunchKernel              
+      5.0          2111632          4   527908.0     9368.5      5067   2087828    1039949.5  cudaDeviceSynchronize         
+      1.1           441843          4   110460.8   114101.0     92869    120772      12497.9  cudaMalloc                    
+      0.1            37002        343      107.9      110.0        60       420         43.7  cuKernelGetName               
+      0.0            19292         14     1378.0      691.0       191      9314       2350.4  cudaStreamIsCapturing_v10000  
+      0.0             9816          8     1227.0      561.5       200      5749       1848.6  cuLibraryGetKernel            
+      0.0              841          1      841.0      841.0       841       841          0.0  cuModuleGetLoadingMode        
+      0.0              541          1      541.0      541.0       541       541          0.0  cudaGetDeviceProperties_v12000
+
+[6/8] Executing 'cuda_gpu_kern_sum' stats report
+
+ Time (%)  Total Time (ns)  Instances  Avg (ns)  Med (ns)  Min (ns)  Max (ns)  StdDev (ns)                                                  Name                                                
+ --------  ---------------  ---------  --------  --------  --------  --------  -----------  ----------------------------------------------------------------------------------------------------
+     68.1          3193338        110   29030.3   28992.0     28896     30816        230.3  resample_trajectory_fp32_kernel(const float *, const float *, const float *, float *, int, int, int…
+     23.1          1084263        110    9856.9    9856.0      9728     10624         98.7  voxelize_occupancy_kernel(const float *, int *, int, float3, float, int, int, int)                  
+      7.7           362466        110    3295.1    3296.0      3232      3424         34.8  void at::native::vectorized_elementwise_kernel<(int)4, at::native::FillFunctor<int>, std::array<cha…
+      0.7            32898          4    8224.5    5568.5      5377     16384       5440.5  void at::native::<unnamed>::distribution_elementwise_grid_stride_kernel<float, (int)4, void at::nat…
+      0.1             6752          1    6752.0    6752.0      6752      6752          0.0  void at::native::<unnamed>::distribution_elementwise_grid_stride_kernel<float, (int)4, void at::nat…
+      0.1             5889          6     981.5     960.0       960      1057         39.1  void <unnamed>::elementwise_kernel_with_index<int, at::native::linspace_cuda_out(const c10::Scalar …
+      0.1             3552          1    3552.0    3552.0      3552      3552          0.0  void at::native::vectorized_elementwise_kernel<(int)4, at::native::AUnaryFunctor<float, float, floa…
+      0.1             3200          1    3200.0    3200.0      3200      3200          0.0  void at::native::vectorized_elementwise_kernel<(int)4, at::native::CUDAFunctorOnSelf_add<float>, st…
+
+[7/8] Executing 'cuda_gpu_mem_time_sum' stats report
+[8/8] Executing 'cuda_gpu_mem_size_sum' stats report
+Generated:
+	/workspace/robocache/robocache/artifacts/nsys_reports/robocache_h100_e2e.nsys-rep
+	/workspace/robocache/robocache/artifacts/nsys_reports/robocache_h100_e2e.sqlite
