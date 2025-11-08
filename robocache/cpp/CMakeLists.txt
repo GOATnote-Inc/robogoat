@@ -16,8 +16,9 @@ list(APPEND CMAKE_PREFIX_PATH ${TORCH_CMAKE_PREFIX})
 find_package(Torch REQUIRED)
 
 # CUDA architectures - EXPLICIT targeting
-set(CMAKE_CUDA_ARCHITECTURES "80;90")  # A100 (sm_80) + H100 (sm_90)
+set(CMAKE_CUDA_ARCHITECTURES "80;89;90")  # A100 (sm_80) + L4 (sm_89) + H100 (sm_90)
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -gencode arch=compute_80,code=sm_80")
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -gencode arch=compute_89,code=sm_89")
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -gencode arch=compute_90,code=sm_90")
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --use_fast_math -Xptxas=-v")
 

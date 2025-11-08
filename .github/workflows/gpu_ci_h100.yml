@@ -56,10 +56,10 @@ jobs:
           cd ${{ github.workspace }}
           python3 -c "import robocache; assert robocache._cuda_available, 'CUDA not available'; print('✅ CUDA kernels loaded')" || echo "Skipped"
       
-      - name: Run smoke test
+      - name: Run smoke test (REGRESSION GATE)
         run: |
           cd ${{ github.workspace }}/robocache
-          python3 benchmarks/smoke.py || echo "Smoke test skipped"
+          python3 benchmarks/smoke.py --assert-min-throughput 100000
       
       - name: Run benchmarks
         run: |

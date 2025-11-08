@@ -1,0 +1,48 @@
+# L4 Inference GPU (SM89) Environment for RoboCache
+# Optimized for edge robotics deployment
+
+FROM nvidia/cuda:13.0-devel-ubuntu22.04
+
+LABEL maintainer="b@thegoatnote.com"
+LABEL description="RoboCache L4 Inference: CUDA 13.0 + TensorRT 10.0 + sm_89"
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV CUDA_HOME=/usr/local/cuda-13.0
+ENV PATH=$CUDA_HOME/bin:$PATH
+ENV LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
+
+# Core dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    git \
+    wget \
+    python3.10 \
+    python3.10-dev \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# PyTorch (CUDA 13.0)
+RUN pip3 install --no-cache-dir \
+    torch==2.5.1+cu121 \
+    --index-url https://download.pytorch.org/whl/cu121
+
+# TensorRT 10.0 (for inference optimization)
+RUN wget https://developer.download.nvidia.com/compute/machine-learning/tensorrt/10.0.0/tars/TensorRT-10.0.0.6.Linux.x86_64-gnu.cuda-13.0.tar.gz \
+    && tar -xzf TensorRT-10.0.0.6.Linux.x86_64-gnu.cuda-13.0.tar.gz -C /opt \
+    && rm TensorRT-10.0.0.6.Linux.x86_64-gnu.cuda-13.0.tar.gz
+ENV LD_LIBRARY_PATH=/opt/TensorRT-10.0.0.6/lib:$LD_LIBRARY_PATH
+
+# RoboCache
+WORKDIR /workspace
+COPY . /workspace/robocache
+
+# Build with L4 (sm_89) targeting
+RUN cd /workspace/robocache && \
+    TORCH_CUDA_ARCH_LIST="8.9" python3 setup.py develop
+
+# Verify L4 binary exists
+RUN python3 -c "import robocache; robocache.self_test()"
+
+CMD ["/bin/bash"]
+
