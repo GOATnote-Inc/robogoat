@@ -1,0 +1,102 @@
+name: Isaac Sim Nightly Validation
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # 2am UTC daily
+  workflow_dispatch:
+    inputs:
+      run_extended:
+        description: 'Run extended validation (1000 steps)'
+        required: false
+        default: 'false'
+
+jobs:
+  isaac-sim-end-to-end:
+    name: Isaac Sim End-to-End Training
+    runs-on: [self-hosted, gpu]
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    
+    environment:
+      name: gpu-runners
+    
+    env:
+      CUDA_VISIBLE_DEVICES: 0
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cu121
+          pip install tensorboard matplotlib pandas pyyaml
+      
+      - name: Build RoboCache
+        working-directory: ./robocache
+        run: |
+          python3 setup.py develop
+      
+      - name: Run Isaac Sim demo (RoboCache mode)
+        working-directory: ./examples/isaac_sim_demo
+        run: |
+          python train_robot_policy.py \
+            --mode robocache \
+            --steps 1000 \
+            --seed 42 \
+            --output results_robocache.json
+      
+      - name: Run Isaac Sim demo (Baseline mode)
+        working-directory: ./examples/isaac_sim_demo
+        run: |
+          python train_robot_policy.py \
+            --mode baseline \
+            --steps 1000 \
+            --seed 42 \
+            --output results_baseline.json
+      
+      - name: Validate against acceptance thresholds (LATENCY GATE)
+        working-directory: ./examples/isaac_sim_demo
+        run: |
+          python validate_thresholds.py \
+            --robocache-results results_robocache.json \
+            --baseline-results results_baseline.json \
+            --thresholds golden_outputs/acceptance_thresholds.yaml \
+            --assert-all
+      
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: isaac-sim-results
+          path: |
+            examples/isaac_sim_demo/results_*.json
+            examples/isaac_sim_demo/logs/
+          retention-days: 30
+      
+      - name: Post results to PR (if from PR)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const results = JSON.parse(fs.readFileSync('examples/isaac_sim_demo/results_robocache.json'));
+            const comment = `## Isaac Sim Validation Results
+            
+            - Latency: ${results.latency_ms.toFixed(2)} ms/step (threshold: <20ms)
+            - Throughput: ${results.throughput.toFixed(0)} eps/sec
+            - Speedup: ${results.speedup.toFixed(2)}x vs baseline
+            
+            ${results.latency_ms < 20.0 ? '✅ PASSED' : '❌ FAILED - Latency exceeds 20ms'}
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+

@@ -44,9 +44,9 @@ RUN wget https://developer.download.nvidia.com/compute/machine-learning/tensorrt
     && rm TensorRT-10.0.0.6.Linux.x86_64-gnu.cuda-13.0.tar.gz
 ENV LD_LIBRARY_PATH=/opt/TensorRT-10.0.0.6/lib:$LD_LIBRARY_PATH
 
-# CUTLASS 4.3.0 (main branch)
+# CUTLASS 4.3.0 (pinned to tag for reproducibility)
 RUN cd /opt && git clone https://github.com/NVIDIA/cutlass.git \
-    && cd cutlass && git checkout main
+    && cd cutlass && git checkout v4.2.1  # Latest stable tag (4.3.0 not yet released)
 ENV CUTLASS_PATH=/opt/cutlass
 
 # RoboCache
