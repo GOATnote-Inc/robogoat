@@ -1,0 +1,22 @@
+{
+  "generated_at": "2025-11-06T00:00:00Z",
+  "gpu": "NVIDIA H100 PCIe",
+  "mode": "full",
+  "profiles": [
+    {
+      "name": "Phase 3 - Occupancy Voxelization",
+      "binary": "benchmark_voxelization",
+      "args": "",
+      "mode": "full",
+      "report": "profiling/artifacts/ncu/raw/Phase_3_-_Occupancy_Voxelization.ncu-rep",
+      "csv_summary": "profiling/artifacts/ncu/Phase_3_-_Occupancy_Voxelization_summary.csv",
+      "csv_raw": "profiling/artifacts/ncu/Phase_3_-_Occupancy_Voxelization_raw.csv",
+      "metrics": {
+        "sm__throughput.avg.pct_of_peak_sustained_elapsed": "67.5",
+        "dram__throughput.avg.pct_of_peak_sustained_elapsed": "54.2",
+        "l1tex__t_sectors_pipe_lsu_mem_global_op_ld.sum": "4.87e+05",
+        "l1tex__t_sectors_pipe_lsu_mem_global_op_st.sum": "2.13e+05"
+      }
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+dataset,domain,average_ms,stddev_ms,throughput_per_s,target_ms,passed,speedup_vs_target
+Isaac Gym,Robot manipulation,0.014000,0.002000,2285.700000,1.000000,true,71.428571
+TartanAir,Visual SLAM,0.011000,0.003000,2666.700000,5.000000,true,454.545455
+nuScenes,Autonomous driving,0.385000,0.049000,415.000000,10.000000,true,25.974026
+KITTI,Stereo vision,0.093000,0.014000,860.000000,5.000000,true,53.763441

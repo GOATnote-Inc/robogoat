@@ -15,12 +15,17 @@
 set -euo pipefail
 
 # Configuration
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 BUILD_DIR="${BUILD_DIR:-build}"
 PHASE="${1:-all}"
 MODE="${2:-fast}"
 WARMUP_LAUNCHES=100
 PROFILE_LAUNCHES=1
-OUTPUT_DIR="ncu_reports"
+ARTIFACT_DIR="${ARTIFACT_DIR:-$REPO_ROOT/profiling/artifacts/ncu}"
+OUTPUT_DIR="${OUTPUT_DIR:-$ARTIFACT_DIR/raw}"
+SUMMARY_JSON="$ARTIFACT_DIR/summary.json"
+
+mkdir -p "$OUTPUT_DIR" "$ARTIFACT_DIR"
 
 # Colors
 GREEN='\033[0;32m'
@@ -46,8 +51,17 @@ if [ ! -d "$BUILD_DIR" ]; then
     exit 1
 fi
 
-# Create output directory
-mkdir -p "$OUTPUT_DIR"
+# Ensure summary stub exists
+if [ ! -f "$SUMMARY_JSON" ]; then
+    cat > "$SUMMARY_JSON" <<'JSON'
+{
+  "generated_at": "",
+  "gpu": "",
+  "mode": "",
+  "profiles": []
+}
+JSON
+fi
 
 # GPU info
 GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader | head -1 || echo "Unknown")
@@ -82,8 +96,9 @@ profile_kernel() {
     $BUILD_DIR/$binary $args > /dev/null 2>&1 || true
     
     # Profile
-    local output_file="$OUTPUT_DIR/${name// /_}.ncu-rep"
-    
+    local safe_name="${name// /_}"
+    local output_file="$OUTPUT_DIR/${safe_name}.ncu-rep"
+
     if [ "$MODE" == "full" ]; then
         ncu --set full \
             --launch-skip $WARMUP_LAUNCHES \
@@ -99,7 +114,57 @@ profile_kernel() {
             -o "$output_file" --force-overwrite \
             $BUILD_DIR/$binary $args
     fi
-    
+
+    local csv_summary="$ARTIFACT_DIR/${safe_name}_summary.csv"
+    local csv_raw="$ARTIFACT_DIR/${safe_name}_raw.csv"
+
+    ncu --import "$output_file" --page summary --csv > "$csv_summary" 2>/dev/null || true
+    ncu --import "$output_file" --page raw --csv > "$csv_raw" 2>/dev/null || true
+
+    python3 <<PYTHON
+import csv
+import json
+import os
+from pathlib import Path
+
+summary_path = Path(${SUMMARY_JSON@Q})
+summary = json.loads(summary_path.read_text(encoding="utf-8"))
+
+csv_file = Path(${csv_summary@Q})
+metrics = {}
+if csv_file.exists():
+    with csv_file.open("r", encoding="utf-8") as handle:
+        reader = csv.reader(handle)
+        rows = [row for row in reader if row]
+    if rows:
+        header = rows[0]
+        data_rows = rows[1:]
+        if len(header) == 2 and header[0].lower() in {"metric", "name"}:
+            metrics = {row[0]: row[1] for row in data_rows if len(row) >= 2}
+        elif len(rows) > 1:
+            metrics = {header[idx]: data_rows[0][idx] for idx in range(min(len(header), len(data_rows[0])))}
+
+entry = {
+    "name": ${name@Q},
+    "binary": ${binary@Q},
+    "args": ${args@Q},
+    "mode": ${MODE@Q},
+    "report": os.path.relpath(${output_file@Q}, ${REPO_ROOT@Q}),
+    "csv_summary": os.path.relpath(${csv_summary@Q}, ${REPO_ROOT@Q}),
+    "csv_raw": os.path.relpath(${csv_raw@Q}, ${REPO_ROOT@Q}),
+    "metrics": metrics,
+}
+
+summary.setdefault("profiles", [])
+summary["profiles"] = [p for p in summary["profiles"] if p.get("name") != entry["name"]]
+summary["profiles"].append(entry)
+summary["generated_at"] = __import__("datetime").datetime.utcnow().isoformat() + "Z"
+summary["gpu"] = ${GPU_NAME@Q}
+summary["mode"] = ${MODE@Q}
+
+summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+PYTHON
+
     echo -e "${GREEN}✅ Saved: $output_file${NC}"
     echo ""
 }

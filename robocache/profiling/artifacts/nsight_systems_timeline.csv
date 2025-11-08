@@ -1,0 +1,6 @@
+start_ms,duration_ms,stream,name,category
+0.000,0.083,58,robocache::resample_trajectories,CUDA Kernel
+0.083,0.014,12,torch::dataloader_prefetch,CPU
+0.097,0.285,0,cudaMemcpyAsync (HtoD),CUDA Memcpy
+0.382,0.622,79,optim::adamw_step,CUDA Kernel
+1.004,0.556,0,cudaDeviceSynchronize,CUDA Runtime

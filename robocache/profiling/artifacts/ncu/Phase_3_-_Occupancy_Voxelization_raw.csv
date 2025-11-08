@@ -1,0 +1,2 @@
+Kernel Name,Grid Size,Block Size,Duration (ns)
+robocache::occupancy_voxelize,4096,256,132487

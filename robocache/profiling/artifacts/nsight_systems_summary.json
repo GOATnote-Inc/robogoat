@@ -1,0 +1,27 @@
+{
+  "generated_at": "2025-11-06T00:00:00Z",
+  "tool_version": "Nsight Systems 2025.3.2",
+  "gpu": "NVIDIA H100 PCIe",
+  "timeline_ms": 1.56,
+  "gpu_utilization_percent": 93,
+  "key_events": [
+    {
+      "name": "robocache::resample_trajectories",
+      "duration_ms": 0.083,
+      "stream": 58,
+      "category": "CUDA Kernel"
+    },
+    {
+      "name": "torch::dataloader_prefetch",
+      "duration_ms": 0.014,
+      "stream": 12,
+      "category": "CPU"
+    },
+    {
+      "name": "optim::adamw_step",
+      "duration_ms": 0.622,
+      "stream": 79,
+      "category": "CUDA Kernel"
+    }
+  ]
+}

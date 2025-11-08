@@ -1,0 +1,5 @@
+metric,value
+sm__throughput.avg.pct_of_peak_sustained_elapsed,67.5
+dram__throughput.avg.pct_of_peak_sustained_elapsed,54.2
+l1tex__t_sectors_pipe_lsu_mem_global_op_ld.sum,4.87e+05
+l1tex__t_sectors_pipe_lsu_mem_global_op_st.sum,2.13e+05

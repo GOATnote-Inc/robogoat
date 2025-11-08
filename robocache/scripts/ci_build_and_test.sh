@@ -11,7 +11,7 @@ echo "=========================================="
 # Configuration
 WORKSPACE=${WORKSPACE:-/workspace/robocache}
 CUDA_PATH=${CUDA_PATH:-/usr/local/cuda-13.0}
-RESULTS_DIR=${RESULTS_DIR:-benchmarks/results/ci}
+RESULTS_DIR=${RESULTS_DIR:-profiling/artifacts/ci}
 
 export PATH=$CUDA_PATH/bin:$PATH
 export LD_LIBRARY_PATH=$CUDA_PATH/lib64:$LD_LIBRARY_PATH
