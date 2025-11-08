@@ -131,6 +131,7 @@
 - [x] All reports use industry-standard profiling tools
 - [x] Examples tested and working
 - [x] License and attribution clear
+- [ ] README feature list matches the exported Python package API (block release if false)
 
 ### File Organization
 - [x] Development work archived (if needed)

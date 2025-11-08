@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__version__ = "0.1.0"
+from ._version import __api_version__, __version__, __version_info__
 
 import sys
 import warnings
@@ -361,6 +361,9 @@ def print_installation_info(stream=None) -> None:
 
 
 __all__ = [
+    "__version__",
+    "__version_info__",
+    "__api_version__",
     "resample_trajectories",
     "voxelize_point_cloud",
     "voxelize_occupancy",
