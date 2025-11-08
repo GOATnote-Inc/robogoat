@@ -1,0 +1,19 @@
+# Habitat Navigation Benchmark Requirements
+
+# Habitat
+habitat-sim==0.3.0
+habitat-lab==0.3.0
+habitat-baselines==0.2.4
+
+# Core dependencies
+torch>=2.0.0
+numpy>=1.21.0
+opencv-python>=4.5.0
+
+# RoboCache (install from source)
+# cd ../../robocache && pip install -e .
+
+# Visualization (optional)
+matplotlib>=3.5.0
+seaborn>=0.11.0
+
