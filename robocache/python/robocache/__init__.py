@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from ._version import __api_version__, __version__, __version_info__
-
+import os
 import sys
 import warnings
 from enum import Enum
@@ -12,7 +11,30 @@ from typing import Dict, Literal, Optional
 
 import torch
 
+from ._version import __api_version__, __version__, __version_info__
 from .backends.pytorch_backend import PyTorchBackend
+
+
+def _env_flag(*names: str, default: bool = False) -> bool:
+    """Return True if any environment variable in *names evaluates to truthy."""
+
+    truthy = {"1", "true", "yes", "on"}
+    seen = False
+    for name in names:
+        value = os.environ.get(name)
+        if value is None:
+            continue
+        seen = True
+        if value.strip().lower() in truthy:
+            return True
+    return default if not seen else False
+
+
+CUDA_BACKEND_ENABLED = _env_flag(
+    "ROBOCACHE_ENABLE_CUDA_BACKEND",
+    "ROBOCACHE_BUILD_WITH_CUDA",
+    default=False,
+)
 
 
 class BackendType(Enum):
@@ -23,6 +45,9 @@ class BackendType(Enum):
 @lru_cache(maxsize=1)
 def _cuda_extension_status() -> tuple[bool, Optional[str]]:
     """Return whether the CUDA extension can be imported."""
+
+    if not CUDA_BACKEND_ENABLED:
+        return False, "CUDA backend disabled for this build"
 
     if not torch.cuda.is_available():
         return False, "CUDA runtime unavailable"
@@ -41,14 +66,22 @@ def _select_backend(requested: Optional[str]) -> BackendType:
 
     normalized = requested.lower() if isinstance(requested, str) else None
 
-    cuda_ok, _ = _cuda_extension_status()
-
     if normalized in {None, "auto"}:
-        if cuda_ok:
-            return BackendType.CUDA
+        if CUDA_BACKEND_ENABLED:
+            cuda_ok, _ = _cuda_extension_status()
+            if cuda_ok:
+                return BackendType.CUDA
         return BackendType.PYTORCH
 
     if normalized == "cuda":
+        if not CUDA_BACKEND_ENABLED:
+            raise RuntimeError(
+                "CUDA backend disabled for this build. Reinstall RoboCache with "
+                "ROBOCACHE_ENABLE_CUDA_BACKEND=1 set during installation, or use "
+                "backend='pytorch'."
+            )
+
+        cuda_ok, _ = _cuda_extension_status()
         if not cuda_ok:
             _, error = _cuda_extension_status()
             raise RuntimeError(
@@ -88,7 +121,16 @@ def resample_trajectories(
     assert source_times.shape == (B, S), f"source_times shape mismatch"
     assert target_times.shape[0] == B, f"target_times batch mismatch"
     
-    backend_choice = _select_backend(backend)
+    try:
+        backend_choice = _select_backend(backend)
+    except RuntimeError as exc:
+        if isinstance(backend, str) and backend.lower() == "cuda":
+            raise NotImplementedError(
+                "CUDA backend is disabled or unavailable in this build. "
+                "Export ROBOCACHE_ENABLE_CUDA_BACKEND=1 during installation and "
+                "provide a CUDA 13+ toolchain to enable it."
+            ) from exc
+        raise
 
     if backend_choice == BackendType.CUDA:
         from . import _cuda_ext
@@ -300,6 +342,7 @@ def check_installation() -> Dict[str, Optional[str]]:
         "pytorch_version": None,
         "cuda_extension_available": False,
         "cuda_extension_error": None,
+        "cuda_backend_enabled": CUDA_BACKEND_ENABLED,
         "default_backend": None,
         "triton_available": False,
         "triton_error": None,
@@ -339,6 +382,9 @@ def print_installation_info(stream=None) -> None:
     print("=" * 60, file=out)
 
     print(f"PyTorch: {'✓ ' + info['pytorch_version'] if info['pytorch_available'] else '✗'}", file=out)
+
+    backend_state = "✓ Enabled" if info["cuda_backend_enabled"] else "✗ Disabled for this build"
+    print(f"CUDA Backend Flag: {backend_state}", file=out)
 
     cuda_status = "✓ Available" if info["cuda_extension_available"] else f"✗ {info['cuda_extension_error']}"
     print(f"CUDA Extension: {cuda_status}", file=out)
