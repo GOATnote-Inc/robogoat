@@ -10,6 +10,7 @@ jobs:
   memcheck:
     name: Memory Check (memcheck)
     runs-on: [self-hosted, gpu]
+    if: false  # Disabled until runners configured
     
     steps:
       - uses: actions/checkout@v4
@@ -55,6 +56,7 @@ jobs:
   racecheck:
     name: Race Check (racecheck)
     runs-on: [self-hosted, gpu]
+    if: false  # Disabled until runners configured
     
     steps:
       - uses: actions/checkout@v4
