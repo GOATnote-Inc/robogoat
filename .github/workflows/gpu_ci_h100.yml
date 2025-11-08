@@ -2,17 +2,33 @@ name: GPU CI - H100
 
 on:
   workflow_dispatch:
-  # Disabled until self-hosted runners are configured
-  # pull_request:
-  #   branches: [main]
-  # push:
-  #   branches: [main]
+    inputs:
+      run_benchmarks:
+        description: 'Run full benchmark suite'
+        required: false
+        default: 'true'
+
+# SECURITY: Self-hosted runners only run on:
+# 1. Manual workflow_dispatch (by maintainers)
+# 2. PRs from branches in this repo (not forks)
+# 3. Pushes to main branch (protected)
 
 jobs:
   build-and-test-h100:
     name: H100 SM90 Validation
     runs-on: self-hosted
-    if: false  # Disabled until runner setup complete
+    # Only run if:
+    # - Manual dispatch, OR
+    # - PR from same repo (not fork), OR
+    # - Push to main from maintainer
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.head.repo.full_name == github.repository)
+    
+    # Add environment protection (optional but recommended)
+    environment:
+      name: gpu-runners
+      # Requires approval from maintainers for external PRs
     
     env:
       CUDA_VISIBLE_DEVICES: 0
