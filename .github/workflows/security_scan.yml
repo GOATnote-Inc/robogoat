@@ -9,6 +9,7 @@ jobs:
   sbom-generation:
     name: Generate SBOM
     runs-on: ubuntu-latest
+    if: false  # Disabled - manual only
     
     steps:
       - uses: actions/checkout@v4

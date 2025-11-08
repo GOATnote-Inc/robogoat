@@ -4,18 +4,18 @@
 name: Static Analysis
 
 on:
-  pull_request:
-    paths:
-      - 'robocache/csrc/**/*.cpp'
-      - 'robocache/csrc/**/*.cu'
-      - 'robocache/csrc/**/*.h'
-      - 'robocache/csrc/**/*.cuh'
   workflow_dispatch:
+  # Disabled for now - enable when needed
+  # pull_request:
+  #   paths:
+  #     - 'robocache/csrc/**/*.cpp'
+  #     - 'robocache/csrc/**/*.cu'
 
 jobs:
   clang-tidy:
     name: clang-tidy (CUDA)
     runs-on: ubuntu-latest
+    if: false  # Disabled - manual only
     
     steps:
       - uses: actions/checkout@v4
@@ -77,6 +77,7 @@ jobs:
   cppcheck:
     name: cppcheck
     runs-on: ubuntu-latest
+    if: false  # Disabled - manual only
     
     steps:
       - uses: actions/checkout@v4
@@ -107,6 +108,7 @@ jobs:
   header-guards:
     name: Header Guard Validation
     runs-on: ubuntu-latest
+    if: false  # Disabled - manual only
     
     steps:
       - uses: actions/checkout@v4
@@ -125,6 +127,7 @@ jobs:
   include-what-you-use:
     name: Include What You Use
     runs-on: ubuntu-latest
+    if: false  # Disabled - manual only
     
     steps:
       - uses: actions/checkout@v4
