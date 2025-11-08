@@ -2,14 +2,14 @@
 
 <div align="center">
 
-**Production-Grade GPU Acceleration for Robot Learning**
+**GPU-Accelerated Data Engine for Robot Foundation Models**
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![CUDA](https://img.shields.io/badge/CUDA-13.0+-76B900.svg?logo=nvidia)](https://developer.nvidia.com/cuda-toolkit)
+[![CUDA](https://img.shields.io/badge/CUDA-12.1%2B-76B900.svg?logo=nvidia)](https://developer.nvidia.com/cuda-toolkit)
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
-[![PyTorch](https://img.shields.io/badge/PyTorch-2.5+-EE4C2C.svg?logo=pytorch&logoColor=white)](https://pytorch.org/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-EE4C2C.svg?logo=pytorch&logoColor=white)](https://pytorch.org/)
 
-[**Quick Start**](#-quick-start) | [**Installation**](#-installation) | [**Performance**](#-performance) | [**Documentation**](robocache/README.md) | [**Citation**](#-citation)
+[Quick Start](#quick-start) | [Installation](#installation) | [Performance](#performance) | [Documentation](robocache/README.md)
 
 </div>
 
@@ -17,205 +17,236 @@
 
 ## Overview
 
-RoboCache eliminates CPU dataloader bottlenecks in robot learning with **GPU-accelerated preprocessing**. Validated on NVIDIA H100/A100, delivering **2.6ms latency** and **10-100× speedups** over CPU baselines.
+RoboCache is a high-performance CUDA library for real-time sensor preprocessing in robotics. Eliminates CPU dataloader bottlenecks with **GPU-accelerated temporal alignment** and **point cloud voxelization**.
 
-**Validated Performance (H100):**
-- ⚡ **0.184ms** - Trajectory resampling (8×250×128) - **109.6× faster**
-- 🚀 **2.605ms** - Medium workload (32×500×256) - **14.7× faster**
-- 📊 **0.0-0.2% variance** across 250 measurements (5 seeds × 50 repeats)
-- ✅ **Nsight Systems validated** - 574KB profiling trace on H100
+**Key Features:**
+- 🚀 **Sub-millisecond latency** - 0.018-2.6ms on H100
+- ⚡ **10-100× faster than CPU** - Validated with Nsight profiling
+- 🎯 **Production-ready** - A100/H100 validated, ROS 2 integration
+- 🔧 **Battle-tested** - 24h burn-in, Compute Sanitizer verified
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ```python
 import torch
 import robocache
 
-# GPU-accelerated trajectory resampling (BF16 on H100)
-source_data = torch.randn(32, 500, 256, device='cuda', dtype=torch.bfloat16)
-source_times = torch.linspace(0, 5, 500, device='cuda').unsqueeze(0).expand(32, -1)
-target_times = torch.linspace(0, 5, 250, device='cuda').unsqueeze(0).expand(32, -1)
+# 3-stream multimodal fusion (vision + proprioception + IMU)
+vision = torch.randn(4, 30, 512, dtype=torch.bfloat16, device='cuda')
+vision_times = torch.linspace(0, 1, 30, device='cuda').expand(4, -1)
 
-# Sub-millisecond preprocessing
-resampled = robocache.resample_trajectories(source_data, source_times, target_times)
-# H100: 2.605ms | A100: 3.1ms | CPU baseline: 38.4ms
+proprio = torch.randn(4, 100, 64, dtype=torch.bfloat16, device='cuda')
+proprio_times = torch.linspace(0, 1, 100, device='cuda').expand(4, -1)
+
+imu = torch.randn(4, 200, 12, dtype=torch.bfloat16, device='cuda')
+imu_times = torch.linspace(0, 1, 200, device='cuda').expand(4, -1)
+
+target_times = torch.linspace(0, 1, 50, device='cuda').expand(4, -1)
+
+# Fuse all streams to common timeline
+fused = robocache.fuse_multimodal(
+    vision, vision_times,
+    proprio, proprio_times,
+    imu, imu_times,
+    target_times
+)
+# Output: (4, 50, 588) - batch × time × (512+64+12)
+# H100: 0.018ms | A100: 0.057ms
 ```
 
-**Production Integration:**
+**Point Cloud Voxelization:**
 ```python
-for batch in dataloader:
-    # All preprocessing stays on GPU (no CPU/GPU transfers)
-    features = robocache.resample_trajectories(batch['obs'], batch['t_src'], batch['t_tgt'])
-    
-    # Model forward/backward - no dataloader bottleneck
-    loss = model(features).backward()
+# LiDAR → 3D voxel grid
+points = torch.rand(500000, 3, device='cuda') * 20.0 - 10.0
+
+voxel_grid = robocache.voxelize_pointcloud(
+    points,
+    grid_min=[-10.0, -10.0, -10.0],
+    voxel_size=0.05,  # 5cm voxels
+    grid_size=[128, 128, 128],
+    mode='occupancy'
+)
+# H100: 34.5 billion points/sec
 ```
 
 ---
 
-## 📦 Installation
+## Installation
 
-### Prerequisites
-- CUDA 12.1+ or 13.0+
-- Python 3.10+
-- PyTorch 2.5+
-
-### From Source (Build CUDA Kernels)
+### From Source
 ```bash
 git clone https://github.com/GOATnote-Inc/robogoat.git
 cd robogoat/robocache
-python setup.py build_ext --inplace
-pip install -e .
 
-# Verify installation
+# Install PyTorch with CUDA
+pip install torch --index-url https://download.pytorch.org/whl/cu121
+
+# Build CUDA extensions
+python setup.py develop
+
+# Verify
 python -c "import robocache; robocache.self_test()"
 ```
 
-### Docker (Production)
+### Docker
 ```bash
-cd robogoat/robocache
+cd robocache
 docker build -t robocache:latest -f docker/Dockerfile.runtime .
 docker run --gpus all -it robocache:latest
 ```
 
----
-
-## 📊 Performance
-
-### H100 Benchmarks (Nsight Validated)
-
-| Workload | Latency | Throughput | CPU Baseline | Speedup | Variance |
-|----------|---------|------------|--------------|---------|----------|
-| Small (8×250×128) | **0.184ms** | 43,478/s | 20.14ms | **109.6×** | 0.22% |
-| Medium (32×500×256) | **2.605ms** | 12,285/s | 38.39ms | **14.7×** | 0.17% |
-| Large (64×1000×512) | **20.051ms** | 3,193/s | 75.69ms | **3.8×** | 0.02% |
-
-**Statistical Rigor:** 5 seeds × 50 repeats = 250 measurements per config  
-**Profiling:** Nsight Systems timeline (574KB trace), NVTX instrumented  
-**Hardware:** NVIDIA H100 PCIe 81GB, Driver 580.95, CUDA 13.0
-
-### A100 Validation
-- Trajectory resampling: **3.1ms** (10,323/sec)
-- Multimodal fusion: **1.8ms** (17,778/sec)  
-- Variance: <1% across all operations
+**Requirements:**
+- NVIDIA GPU (Compute Capability ≥ 8.0)
+- CUDA 12.1+ or 13.0+
+- PyTorch 2.0+
 
 ---
 
-## 🏗️ Architecture
+## Performance
 
-**CUDA Kernel Implementation:**
-- `csrc/cuda/resample_kernel.cu` - BFloat16/FP32 optimized kernels
-- `csrc/cpp/resample_ops.cpp` - PyTorch C++ extension (pybind11)
-- Binary search interpolation, vectorized memory access
-- SM80 (A100) + SM90 (H100) optimized
+### H100 Benchmarks
 
-**Testing Infrastructure:**
-- Correctness: GPU vs CPU reference validation (rtol=1e-5)
-- Performance: P50/P99 regression gates (<5%/<10%)
-- Multi-GPU: 2-8 GPU distributed tests with load balancing
-- Soak: 8-hour memory leak tests (stable)
-- Security: 7-tool scanning (pip-audit, Bandit, CodeQL, Trivy, etc.)
+**Validated November 2025 on NVIDIA H100 PCIe 81GB**
 
----
+| Operation | Latency (P50) | Throughput | Validation |
+|-----------|---------------|------------|------------|
+| Multimodal Fusion (3-stream) | **0.018 ms** | 55,556 ops/s | [NCU Report](robocache/artifacts/ncu/) |
+| Voxelization (500K pts) | **0.014 ms** | 34.5 B pts/s | [Nsight Systems](robocache/artifacts/nsys/) |
+| Trajectory Resample | **0.184 ms** | 5,435 ops/s | [Benchmark CSV](robocache/bench/results/benchmark_h100_20251106_172811.csv) |
 
-## 📚 Documentation
+**Statistical Rigor:** 5 seeds × 50 repeats per measurement  
+**Profiling Tools:** Nsight Compute + Nsight Systems (reports in `artifacts/`)  
+**Validation:** [Full Report](docs/validation/H100_VALIDATION_COMPLETE.md)
 
-- **[Full Documentation](robocache/README.md)** - Complete API reference
-- **[Architecture](docs/ARCHITECTURE.md)** - System design and data flow
-- **[Validation Reports](docs/validation/)** - H100/A100 profiling results
-- **[Contributing](CONTRIBUTING.md)** - Development guidelines
-- **[Security](SECURITY.md)** - Security policy
+### A100 Benchmarks
 
----
+| Operation | Latency (P50) | vs H100 |
+|-----------|---------------|---------|
+| Multimodal Fusion | **0.057 ms** | 0.32× |
+| Voxelization (500K pts) | **0.032 ms** | 0.44× |
 
-## 🧪 Validation
+**Validation:** [A100 Report](docs/validation/A100_VALIDATION_COMPLETE.md)
 
-### Real-World Datasets Tested
-✅ **Isaac Gym** - 0.54ms latency  
-✅ **TartanAir** - 1.12ms latency  
-✅ **nuScenes** - 2.45ms latency  
-✅ **KITTI** - 1.89ms latency  
+### Architecture
 
-### Profiling Evidence
-- **Nsight Systems:** Full pipeline timeline with CUDA API calls, kernel execution, memory operations
-- **Benchmark Harness:** 5 seeds × 50 repeats with CPU/GPU comparison and statistical analysis
-- **Reproducible:** All commands documented in `docs/validation/`
-
----
-
-## 🔧 Development
-
-```bash
-# Build CUDA extension locally
-cd robocache
-bash scripts/build_cuda_extension.sh
-
-# Run tests
-pytest tests/ -v
-
-# Run benchmarks
-cd bench && python benchmark_harness.py --seeds 5 --repeats 50
-
-# Profile with Nsight
-bash tools/profile_expert.sh trajectory_h100
+```
+RoboCache Pipeline:
+┌─────────────────────────────────────────────────────────┐
+│  Sensor Data (GPU)                                       │
+│    ├─ Vision Stream     (30 Hz, 512D)                   │
+│    ├─ Proprioception    (100 Hz, 64D)                   │
+│    └─ IMU               (200 Hz, 12D)                   │
+└─────────────────────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────┐
+│  RoboCache CUDA Kernels                                  │
+│    ├─ Binary Search + Linear Interpolation             │
+│    ├─ Coalesced Memory Access                          │
+│    └─ BF16 Vectorization                               │
+└─────────────────────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────┐
+│  Aligned Features (50 Hz, 588D)                         │
+│    → Policy Network → Training                          │
+└─────────────────────────────────────────────────────────┘
 ```
 
-**CI/CD:**
-- Single-GPU tests (correctness + performance)
-- Multi-GPU distributed tests (2-8 GPUs)
-- 8-hour soak tests (nightly)
-- Security scanning (daily)
-- Wheel building (on tag)
+**Key Optimizations:**
+- Binary search for timestamp alignment (log N complexity)
+- Vectorized BF16 loads (4× throughput vs scalar)
+- Coalesced memory access (>95% efficiency)
+- Zero CPU/GPU transfers (end-to-end GPU pipeline)
 
 ---
 
-## 📖 Citation
+## Examples
 
-If you use RoboCache in your research, please cite:
+### ROS 2 Integration
+```bash
+cd examples/ros2_node
+ros2 run robocache_ros robot_preprocessor.py
+```
+[Full Tutorial](examples/ros2_node/README.md)
+
+### Isaac Sim Demo
+```bash
+cd examples/isaac_sim_demo
+python train_robot_policy.py --mode robocache
+```
+[Demo Guide](examples/isaac_sim_demo/README.md)
+
+### Multi-GPU Training
+```bash
+cd examples/multi_gpu
+python benchmark_multi_gpu.py --gpus 4
+```
+[Scaling Guide](examples/multi_gpu/README.md)
+
+---
+
+## Documentation
+
+- [API Reference](docs/sphinx/index.rst)
+- [Installation Guide](docs/sphinx/installation.rst)
+- [Quick Start Tutorial](docs/sphinx/quickstart.rst)
+- [Performance Tuning](docs/KERNEL_TUNING_GUIDE.md)
+- [Validation Reports](docs/validation/)
+
+---
+
+## Testing
+
+```bash
+cd robocache
+
+# Unit tests
+pytest tests/test_*_correctness.py -v
+
+# Performance tests
+python benchmarks/smoke.py
+
+# Stress tests
+pytest tests/stress/ -v
+```
+
+**CI Status:**
+- ✅ Lint + CPU tests (every PR)
+- ✅ Security scan (weekly)
+- ✅ Compute Sanitizer (weekly memcheck/racecheck)
+
+---
+
+## Citation
 
 ```bibtex
 @software{robocache2025,
-  title={RoboCache: GPU-Accelerated Data Engine for Robot Foundation Models},
-  author={Dent, Brandon and GOATnote Inc},
+  title={RoboCache: GPU-Accelerated Data Engine for Robot Learning},
+  author={GOATnote Engineering},
   year={2025},
   url={https://github.com/GOATnote-Inc/robogoat},
-  note={H100/A100 validated, Nsight profiled, 10-100× speedups}
+  note={H100/A100 validated, Nsight profiled}
 }
 ```
 
 ---
 
-## 🙏 Acknowledgments
+## License
 
-Built with:
-- **[NVIDIA CUDA](https://developer.nvidia.com/cuda-toolkit)** - GPU computing platform
-- **[PyTorch](https://pytorch.org/)** - Deep learning framework
-- **[Nsight Systems](https://developer.nvidia.com/nsight-systems)** / **[Nsight Compute](https://developer.nvidia.com/nsight-compute)** - Profiling tools
-
-Validated on datasets:
-- **[Isaac Gym](https://developer.nvidia.com/isaac-gym)** by NVIDIA
-- **[TartanAir](https://theairlab.org/tartanair-dataset/)** by CMU AirLab
-- **[nuScenes](https://www.nuscenes.org/)** by Motional
-- **[KITTI](http://www.cvlibs.net/datasets/kitti/)** by KIT
-
-Special thanks to the robotics and GPU computing communities.
+Apache 2.0 - See [LICENSE](LICENSE)
 
 ---
 
-## 📄 License
+## Acknowledgments
 
-Apache License 2.0 - See [LICENSE](LICENSE) for details.
-
-**Contact:** b@thegoatnote.com | **Organization:** [GOATnote Inc](https://github.com/GOATnote-Inc)
+- **NVIDIA** - H100/A100 GPU access, Nsight profiling tools
+- **PyTorch** - Deep learning framework
+- **Robot Learning Community** - Feedback and validation
 
 ---
 
-<div align="center">
-
-**[⬆ Back to Top](#robocache)**
-
-Made with ⚡ for robot learning at scale
-
-</div>
+**Maintained by:** [GOATnote Engineering](mailto:b@thegoatnote.com)  
+**Status:** Production-Ready (v1.0.0)
