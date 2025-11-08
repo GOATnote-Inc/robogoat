@@ -53,7 +53,7 @@ fused = robocache.fuse_multimodal(
     target_times
 )
 # Output: (4, 50, 588) - batch × time × (512+64+12)
-# H100: 0.018ms | A100: 0.057ms
+# H100: 0.034ms | A100: 0.057ms
 ```
 
 **Point Cloud Voxelization:**
@@ -68,7 +68,7 @@ voxel_grid = robocache.voxelize_pointcloud(
     grid_size=[128, 128, 128],
     mode='occupancy'
 )
-# H100: 34.5 billion points/sec
+# H100: 24 billion points/sec | A100: 21 billion points/sec
 ```
 
 ---
@@ -108,13 +108,13 @@ docker run --gpus all -it robocache:latest
 
 ### H100 Benchmarks
 
-**Validated November 2025 on NVIDIA H100 PCIe 81GB**
+**Validated November 2025 on NVIDIA H100 PCIe 80GB** (with P0 API - see [artifacts/h100_validation_final_results.md](artifacts/h100_validation_final_results.md))
 
-| Operation | Latency (P50) | Throughput | Validation |
-|-----------|---------------|------------|------------|
-| Trajectory Resample (8×250×128) | **0.184 ms** | 5,435 ops/s | [Benchmark CSV](robocache/bench/results/benchmark_h100_20251106_172811.csv) |
-| Trajectory Resample (32×500×256) | **2.605 ms** | 12,285 ops/s | [Benchmark CSV](robocache/bench/results/benchmark_h100_20251106_172811.csv) |
-| Trajectory Resample (64×1000×512) | **20.051 ms** | 3,193 ops/s | [Benchmark CSV](robocache/bench/results/benchmark_h100_20251106_172811.csv) |
+| Operation | Latency (Mean ± Std) | Throughput | Validation |
+|-----------|---------------------|------------|------------|
+| Trajectory Resample (32×500×256, bf16) | **0.0353 ± 0.0016 ms** | 28,300 ops/s | [H100 Results](artifacts/h100_validation_final_results.md) |
+| Voxelization (500K pts, 128³ grid) | **0.0205 ms** | 24.3 B pts/s | [H100 Results](artifacts/h100_validation_final_results.md) |
+| Multimodal Fusion (3 streams→50Hz) | **0.0339 ± 0.0022 ms** | 29,500 ops/s | [H100 Results](artifacts/h100_validation_final_results.md) |
 
 **Statistical Rigor:** 5 seeds × 50 repeats = 250 measurements per config  
 **Hardware:** NVIDIA H100 PCIe 81GB, CUDA 13.0, Driver 580.95  
@@ -185,9 +185,9 @@ RoboCache Pipeline:
 
 | Operation | H100 Latency | A100 Latency | Scaling | Report |
 |-----------|--------------|--------------|---------|--------|
-| Multimodal Fusion | 0.018 ms (P50) | 0.057 ms (P50) | 0.88x | [A100 Validation](docs/validation/A100_VALIDATION_COMPLETE.md) |
-| Voxelization (occupancy) | 0.016 ms | 0.032 ms | 0.63x | [A100 Validation](docs/validation/A100_VALIDATION_COMPLETE.md) |
-| End-to-end Training | 14.04 ms/step | 18.28 ms/step | 0.77x | [Production Summary](docs/internal/PRODUCTION_VALIDATION_SUMMARY.md) |
+| Multimodal Fusion | 0.034 ms (Mean) | 0.057 ms (P50) | 0.60x | [H100 Results](artifacts/h100_validation_final_results.md) |
+| Voxelization (500K pts) | 0.021 ms (Mean) | 0.032 ms (P50) | 0.66x | [H100 Results](artifacts/h100_validation_final_results.md) |
+| Trajectory Resample | 0.035 ms (Mean) | ~0.05 ms (est.) | ~0.70x | [H100 Results](artifacts/h100_validation_final_results.md) |
 
 **Throughput:** 15-16 billion points/sec (count/occupancy), 5-7 B pts/s (mean/max)  
 **Status:** ✅ Production-validated on both H100 (SM90) and A100 (SM80)
@@ -290,6 +290,40 @@ pytest tests/stress/ -v
 
 ---
 
+## Known Limitations
+
+### Performance Considerations
+- **Trajectory Resampling:** Optimal for batch sizes 8-64. Single-sample latency may be dominated by kernel launch overhead (~5μs).
+- **Voxelization:** Throughput scales with point count. For <10K points, CPU implementation may be competitive due to launch overhead.
+- **Multimodal Fusion:** Currently uses 3 sequential kernel launches. Kernel fusion could reduce latency by ~40% (future optimization).
+
+### Hardware Compatibility
+- **Minimum:** CUDA Compute Capability 8.0 (A100, A10G, RTX 3090)
+- **Tested:** H100 PCIe (SM90), A100 SXM4 (SM80)  
+- **Not tested:** V100 (SM70), consumer GPUs (RTX 4090)
+- **BFloat16:** Requires SM80+ (A100/H100). Falls back to FP32 on older hardware.
+
+### API Stability
+- **Public API:** `resample_trajectories()`, `voxelize_pointcloud()`, `fuse_multimodal()` - stable
+- **Experimental:** Streaming kernels, CUTLASS-based implementations - subject to change
+- **Backward compatibility:** See `artifacts/kernel_inventory.md` for production vs research status
+
+### Functional Limitations
+- **Timestamp monotonicity:** Not enforced. User must ensure monotonically increasing timestamps.
+- **Out-of-bounds:** Voxelization clips points outside grid bounds (no error thrown).
+- **Empty inputs:** Zero-length tensors may cause undefined behavior (add validation in production code).
+
+### Documentation
+- **Performance claims:** All claims based on H100/A100 measurements. See `artifacts/h100_validation_final_results.md` for exact configs.
+- **Benchmark reproducibility:** Requires same hardware, driver version, and CUDA toolkit. Variations up to ±10% are normal.
+
+**For detailed analysis and optimization guidance, see:**
+- [H100 Validation Report](artifacts/h100_validation_final_results.md)
+- [Performance Claims Evidence Matrix](artifacts/performance_claims_evidence_matrix.md)
+- [Kernel Inventory](artifacts/kernel_inventory.md)
+
+---
+
 ## License
 
 Apache 2.0 - See [LICENSE](LICENSE)
@@ -301,6 +335,7 @@ Apache 2.0 - See [LICENSE](LICENSE)
 - **NVIDIA** - H100/A100 GPU access, Nsight profiling tools
 - **PyTorch** - Deep learning framework
 - **Robot Learning Community** - Feedback and validation
+- **Performance Validation** - NVIDIA Nsight Compute & Nsight Systems profiling
 
 ---
 
