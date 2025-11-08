@@ -1,0 +1,43 @@
+{
+  "claim_id": "multimodal_h100_latency",
+  "readme_claim": "H100: 0.018ms for 3 streams @ 100Hz -> 50Hz",
+  "readme_location": "README.md:56",
+  "operation": "fuse_multimodal",
+  "hardware": "h100",
+  "parameters": {
+    "batch_size": 4,
+    "stream1_shape": [30, 512],
+    "stream1_freq_hz": 30,
+    "stream1_duration_sec": 1.0,
+    "stream2_shape": [100, 64],
+    "stream2_freq_hz": 100,
+    "stream2_duration_sec": 1.0,
+    "stream3_shape": [200, 12],
+    "stream3_freq_hz": 200,
+    "stream3_duration_sec": 1.0,
+    "target_freq_hz": 50,
+    "dtype": "bfloat16",
+    "device": "cuda:0"
+  },
+  "measurement": {
+    "warmup_iterations": 20,
+    "measurement_iterations": 100,
+    "use_cuda_events": true,
+    "synchronize": true
+  },
+  "acceptance_criteria": {
+    "metric": "latency_ms",
+    "target": 0.018,
+    "tolerance_percent": 55,
+    "max_acceptable_ms": 0.028,
+    "min_acceptable_ms": 0.008
+  },
+  "ncu_metrics": [
+    "gpu__time_duration.sum",
+    "dram__bytes_read.sum",
+    "dram__bytes_write.sum",
+    "sm__throughput.avg.pct_of_peak_sustained_elapsed",
+    "gpu__compute_memory_throughput.avg.pct_of_peak_sustained_elapsed"
+  ]
+}
+

@@ -12,7 +12,28 @@ import torch
 from typing import Tuple
 
 
-def resample_trajectories_cpu(
+def resample_single_stream_cpu(
+    source_data: torch.Tensor,
+    source_times: torch.Tensor,
+    target_times: torch.Tensor
+) -> torch.Tensor:
+    """
+    CPU fallback for single-stream trajectory resampling.
+    
+    Uses timestamp-aware linear interpolation.
+    
+    Args:
+        source_data: (batch, T_src, D) source trajectory
+        source_times: (batch, T_src) source timestamps
+        target_times: (batch, T_tgt) target timestamps
+    
+    Returns:
+        resampled: (batch, T_tgt, D) resampled trajectory
+    """
+    return _interpolate_stream(source_data, source_times, target_times)
+
+
+def fuse_multimodal_cpu(
     vision: torch.Tensor,
     vision_times: torch.Tensor,
     proprio: torch.Tensor,

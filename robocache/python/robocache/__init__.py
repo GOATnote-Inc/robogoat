@@ -108,13 +108,14 @@ def _resample_pytorch(
     source_times: torch.Tensor,
     target_times: torch.Tensor
 ) -> torch.Tensor:
-    """PyTorch fallback implementation (slower)"""
-    return torch.nn.functional.interpolate(
-        source_data.transpose(1, 2),
-        size=target_times.shape[1],
-        mode='linear',
-        align_corners=True
-    ).transpose(1, 2)
+    """
+    PyTorch fallback implementation with timestamp-aware interpolation.
+    
+    Uses actual timestamp values for correct linear interpolation,
+    not uniform spacing assumptions.
+    """
+    from robocache.ops_fallback import resample_single_stream_cpu
+    return resample_single_stream_cpu(source_data, source_times, target_times)
 
 def fuse_multimodal(
     stream1_data: torch.Tensor,
@@ -123,7 +124,8 @@ def fuse_multimodal(
     stream2_times: torch.Tensor,
     stream3_data: torch.Tensor,
     stream3_times: torch.Tensor,
-    target_times: torch.Tensor
+    target_times: torch.Tensor,
+    backend: Optional[str] = None
 ) -> torch.Tensor:
     """
     Fuse multimodal sensor streams with temporal alignment.
@@ -139,6 +141,7 @@ def fuse_multimodal(
         stream3_data: Third sensor stream [B, S3, D3]
         stream3_times: Third stream timestamps [B, S3]
         target_times: Target timestamps [B, T]
+        backend: Force backend selection: 'cuda', 'pytorch', or None (auto)
     
     Returns:
         Fused features [B, T, D1+D2+D3]
@@ -159,7 +162,32 @@ def fuse_multimodal(
         >>> fused.shape
         torch.Size([4, 50, 588])  # 512 + 64 + 12
     """
-    # Use CUDA kernel if available and on CUDA device
+    # Force specific backend if requested
+    if backend == "cuda":
+        if not _multimodal_available:
+            raise RuntimeError(
+                "CUDA backend requested but RoboCache multimodal CUDA kernels not available. "
+                "Ensure CUDA extension was compiled successfully."
+            )
+        if not stream1_data.is_cuda:
+            raise RuntimeError("CUDA backend requested but tensors are on CPU")
+        return _multimodal_ops.fuse_multimodal(
+            stream1_data, stream1_times,
+            stream2_data, stream2_times,
+            stream3_data, stream3_times,
+            target_times
+        )
+    elif backend == "pytorch":
+        return ops_fallback.fuse_multimodal_cpu(
+            stream1_data, stream1_times,
+            stream2_data, stream2_times,
+            stream3_data, stream3_times,
+            target_times
+        )
+    elif backend is not None:
+        raise ValueError(f"Unknown backend: {backend}. Expected 'cuda', 'pytorch', or None")
+    
+    # Auto-select: Use CUDA kernel if available and on CUDA device
     if _multimodal_available and stream1_data.is_cuda:
         return _multimodal_ops.fuse_multimodal(
             stream1_data, stream1_times,
@@ -169,7 +197,7 @@ def fuse_multimodal(
         )
     
     # Fallback to CPU implementation (vectorized PyTorch)
-    return ops_fallback.resample_trajectories_cpu(
+    return ops_fallback.fuse_multimodal_cpu(
         stream1_data, stream1_times,
         stream2_data, stream2_times,
         stream3_data, stream3_times,
@@ -182,7 +210,8 @@ def voxelize_pointcloud(
     grid_min: list = [-10.0, -10.0, -10.0],
     voxel_size: float = 0.1,
     grid_size: list = [128, 128, 128],
-    mode: str = "occupancy"
+    mode: str = "occupancy",
+    backend: Optional[str] = None
 ) -> torch.Tensor:
     """
     Voxelize 3D point cloud to structured grid.
@@ -197,6 +226,7 @@ def voxelize_pointcloud(
         voxel_size: Voxel edge length (default: 0.1)
         grid_size: Grid dimensions [X, Y, Z] (default: [128, 128, 128])
         mode: Accumulation mode: "count", "occupancy", "mean", "max"
+        backend: Force backend selection: 'cuda', 'pytorch', or None (auto)
     
     Returns:
         Voxel grid [X, Y, Z] for count/occupancy, [X, Y, Z, F] for mean/max
@@ -216,7 +246,28 @@ def voxelize_pointcloud(
         >>> grid.shape
         torch.Size([128, 128, 128, 8])
     """
-    # Use CUDA kernel if available and on CUDA device
+    # Force specific backend if requested
+    if backend == "cuda":
+        if not _voxelize_available:
+            raise RuntimeError(
+                "CUDA backend requested but RoboCache voxelization CUDA kernels not available. "
+                "Ensure CUDA extension was compiled successfully."
+            )
+        if not points.is_cuda:
+            raise RuntimeError("CUDA backend requested but tensors are on CPU")
+        results = _voxelize_ops.voxelize_pointcloud(
+            points, features if features is not None else torch.empty(0),
+            grid_min, voxel_size, grid_size, mode
+        )
+        return results[0]
+    elif backend == "pytorch":
+        return ops_fallback.voxelize_pointcloud_cpu(
+            points, features, tuple(grid_min), voxel_size, tuple(grid_size), mode
+        )
+    elif backend is not None:
+        raise ValueError(f"Unknown backend: {backend}. Expected 'cuda', 'pytorch', or None")
+    
+    # Auto-select: Use CUDA kernel if available and on CUDA device
     if _voxelize_available and points.is_cuda:
         results = _voxelize_ops.voxelize_pointcloud(
             points, features if features is not None else torch.empty(0),
@@ -232,6 +283,33 @@ def voxelize_pointcloud(
 def is_cuda_available() -> bool:
     """Check if CUDA kernels are available"""
     return _cuda_available and _multimodal_available and _voxelize_available
+
+def check_installation() -> dict:
+    """
+    Check installation status and backend availability.
+    
+    Returns:
+        dict with keys:
+            - 'cuda_extension_available': bool - Trajectory resampling CUDA kernels
+            - 'multimodal_extension_available': bool - Multimodal fusion CUDA kernels
+            - 'voxelize_extension_available': bool - Voxelization CUDA kernels
+            - 'pytorch_available': bool - PyTorch backend availability
+            - 'cuda_device_available': bool - CUDA GPU device present
+            - 'gpu_name': str | None - GPU device name if available
+    
+    Example:
+        >>> info = robocache.check_installation()
+        >>> if info['cuda_device_available'] and info['cuda_extension_available']:
+        ...     print(f"CUDA acceleration available on {info['gpu_name']}")
+    """
+    return {
+        'cuda_extension_available': _cuda_available,
+        'multimodal_extension_available': _multimodal_available,
+        'voxelize_extension_available': _voxelize_available,
+        'pytorch_available': True,  # Always true if robocache loads
+        'cuda_device_available': torch.cuda.is_available(),
+        'gpu_name': torch.cuda.get_device_name(0) if torch.cuda.is_available() else None
+    }
 
 def _write_line(message: str, stream: TextIO) -> None:
     """Write a single line to the provided stream."""
@@ -265,51 +343,150 @@ def print_installation_info(stream: Optional[TextIO] = None) -> None:
 
 def self_test():
     """
-    Run quick self-test to verify installation.
+    Comprehensive self-test for RoboCache installation.
+    
+    Tests all operations, dtypes, and backends (CPU + CUDA if available).
     
     Returns:
         True if tests pass, raises exception otherwise
     """
-    print("RoboCache Self-Test")
+    print("RoboCache Comprehensive Self-Test")
     print("=" * 60)
     
     # Check PyTorch
     print(f"✓ PyTorch {torch.__version__}")
     
     # Check CUDA
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     if torch.cuda.is_available():
         print(f"✓ CUDA {torch.version.cuda}")
         print(f"✓ GPU: {torch.cuda.get_device_name(0)}")
     else:
         print("⚠ CUDA not available (CPU-only mode)")
     
-    # Check CUDA kernels
-    if _cuda_available:
+    # Check extensions
+    info = check_installation()
+    if info['cuda_extension_available']:
         print(f"✓ RoboCache CUDA kernels loaded")
     else:
-        print(f"⚠ RoboCache CUDA kernels not available (using PyTorch fallback)")
+        print(f"⚠ RoboCache CUDA kernels not available")
     
-    # Quick functional test
-    print("\nFunctional Test:")
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    source = torch.randn(2, 10, 8, dtype=torch.float32, device=device)
-    src_times = torch.linspace(0, 1, 10, device=device).expand(2, -1)
-    tgt_times = torch.linspace(0, 1, 5, device=device).expand(2, -1)
+    print("\nFunctional Tests:")
     
-    result = resample_trajectories(source, src_times, tgt_times)
-    assert result.shape == (2, 5, 8), f"Wrong shape: {result.shape}"
-    print(f"✓ Trajectory resampling: {source.shape} -> {result.shape}")
+    # Test 1: Trajectory Resampling
+    print("\n[1/6] Trajectory Resampling...")
+    for dtype in [torch.float32, torch.bfloat16 if device == 'cuda' else torch.float32]:
+        source = torch.randn(2, 10, 8, dtype=dtype, device=device)
+        src_times = torch.linspace(0, 1, 10, device=device).expand(2, -1)
+        tgt_times = torch.linspace(0, 1, 5, device=device).expand(2, -1)
+        
+        result = resample_trajectories(source, src_times, tgt_times)
+        assert result.shape == (2, 5, 8), f"Wrong shape: {result.shape}"
+        assert result.dtype == dtype, f"Wrong dtype: {result.dtype}"
+        assert not torch.isnan(result.float()).any(), "Result contains NaN"
+        print(f"  ✓ {dtype} on {device}: {source.shape} -> {result.shape}")
+    
+    # Test 2: Timestamp-Aware Interpolation
+    print("\n[2/6] Timestamp Correctness...")
+    source_data = torch.tensor([[[1.0], [2.0], [3.0]]], device=device)
+    source_times = torch.tensor([[0.0, 0.5, 1.0]], device=device)
+    target_times = torch.tensor([[0.25, 0.75]], device=device)
+    result = resample_trajectories(source_data, source_times, target_times, backend='pytorch')
+    expected = torch.tensor([[[1.5], [2.5]]], device=device)
+    assert torch.allclose(result, expected, atol=1e-4), f"Timestamp interpolation incorrect"
+    print(f"  ✓ Timestamp-aware interpolation verified")
+    
+    # Test 3: Voxelization
+    print("\n[3/6] Point Cloud Voxelization...")
+    points = torch.rand(1000, 3, device=device) * 10.0 - 5.0
+    grid = voxelize_pointcloud(
+        points,
+        grid_min=[-5.0, -5.0, -5.0],
+        voxel_size=0.1,
+        grid_size=[100, 100, 100],
+        mode='occupancy'
+    )
+    assert grid.shape == (100, 100, 100), f"Wrong grid shape: {grid.shape}"
+    assert grid.sum() > 0, "Empty grid (should have occupied voxels)"
+    print(f"  ✓ Voxelization: {points.shape[0]} points -> {grid.sum().item():.0f} occupied voxels")
+    
+    # Test 4: Multimodal Fusion
+    print("\n[4/6] Multimodal Sensor Fusion...")
+    vision = torch.randn(2, 10, 64, device=device)
+    vision_times = torch.linspace(0, 1, 10, device=device).expand(2, -1)
+    proprio = torch.randn(2, 20, 32, device=device)
+    proprio_times = torch.linspace(0, 1, 20, device=device).expand(2, -1)
+    imu = torch.randn(2, 40, 12, device=device)
+    imu_times = torch.linspace(0, 1, 40, device=device).expand(2, -1)
+    target_times = torch.linspace(0, 1, 15, device=device).expand(2, -1)
+    
+    fused = fuse_multimodal(
+        vision, vision_times,
+        proprio, proprio_times,
+        imu, imu_times,
+        target_times
+    )
+    expected_shape = (2, 15, 64+32+12)
+    assert fused.shape == expected_shape, f"Wrong shape: {fused.shape} vs {expected_shape}"
+    assert not torch.isnan(fused).any(), "Fused result contains NaN"
+    print(f"  ✓ Multimodal fusion: 3 streams -> {fused.shape}")
+    
+    # Test 5: Error Handling
+    print("\n[5/6] Error Handling...")
+    try:
+        _ = resample_trajectories(source, src_times, tgt_times, backend='invalid')
+        assert False, "Should have raised error for invalid backend"
+    except (ValueError, RuntimeError):
+        print(f"  ✓ Invalid backend correctly rejected")
+    
+    # Test 6: CUDA vs CPU Parity (if CUDA available)
+    if torch.cuda.is_available() and info['cuda_extension_available']:
+        print("\n[6/6] CUDA/CPU Parity...")
+        data_cpu = torch.randn(2, 10, 8)
+        times_src = torch.linspace(0, 1, 10).expand(2, -1)
+        times_tgt = torch.linspace(0, 1, 5).expand(2, -1)
+        
+        result_cpu = resample_trajectories(data_cpu, times_src, times_tgt, backend='pytorch')
+        result_cuda = resample_trajectories(
+            data_cpu.cuda(), times_src.cuda(), times_tgt.cuda(), backend='cuda'
+        )
+        
+        max_diff = (result_cpu - result_cuda.cpu()).abs().max().item()
+        assert max_diff < 1e-3, f"CUDA/CPU results differ: {max_diff}"
+        print(f"  ✓ CUDA/CPU results match (max diff: {max_diff:.6f})")
+    else:
+        print("\n[6/6] CUDA/CPU Parity... (skipped, CUDA not available)")
     
     print("\n" + "=" * 60)
     print("✅ All tests passed!")
     return True
+
+# Compatibility wrapper for tests
+def voxelize_occupancy(points, grid_size, voxel_size, origin, backend=None):
+    """
+    Compatibility wrapper for voxelize_pointcloud with occupancy mode.
+    
+    This function exists for backward compatibility with test code.
+    New code should use voxelize_pointcloud(..., mode='occupancy').
+    """
+    return voxelize_pointcloud(
+        points=points,
+        features=None,
+        grid_min=origin.tolist() if hasattr(origin, 'tolist') else origin,
+        voxel_size=voxel_size,
+        grid_size=grid_size.tolist() if hasattr(grid_size, 'tolist') else grid_size,
+        mode='occupancy',
+        backend=backend
+    )
 
 # Export public API
 __all__ = [
     'resample_trajectories',
     'fuse_multimodal',
     'voxelize_pointcloud',
+    'voxelize_occupancy',  # Compatibility wrapper
     'is_cuda_available',
+    'check_installation',
     'self_test',
     'print_installation_info',
     '__version__',

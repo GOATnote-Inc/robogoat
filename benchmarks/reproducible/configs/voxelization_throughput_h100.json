@@ -1,0 +1,35 @@
+{
+  "claim_id": "voxel_h100_throughput",
+  "readme_claim": "H100: >2.5B points/sec @ 128³ grid",
+  "readme_location": "README.md:71",
+  "operation": "voxelize_pointcloud",
+  "hardware": "h100",
+  "parameters": {
+    "num_points": 500000,
+    "grid_size": [128, 128, 128],
+    "grid_min": [-10.0, -10.0, -10.0],
+    "voxel_size": 0.05,
+    "mode": "occupancy",
+    "dtype": "float32",
+    "device": "cuda:0"
+  },
+  "measurement": {
+    "warmup_iterations": 20,
+    "measurement_iterations": 100,
+    "use_cuda_events": true,
+    "synchronize": true
+  },
+  "acceptance_criteria": {
+    "metric": "throughput_points_per_sec",
+    "target": 2500000000,
+    "tolerance_percent": 20,
+    "min_acceptable": 2000000000
+  },
+  "ncu_metrics": [
+    "gpu__time_duration.sum",
+    "dram__throughput.avg.pct_of_peak_sustained_elapsed",
+    "sm__throughput.avg.pct_of_peak_sustained_elapsed",
+    "sm__sass_thread_inst_executed_op_memory_pred_on.sum"
+  ]
+}
+
