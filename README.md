@@ -112,22 +112,23 @@ docker run --gpus all -it robocache:latest
 
 | Operation | Latency (P50) | Throughput | Validation |
 |-----------|---------------|------------|------------|
-| Multimodal Fusion (3-stream) | **0.018 ms** | 55,556 ops/s | [NCU Report](robocache/artifacts/ncu/) |
-| Voxelization (500K pts) | **0.014 ms** | 34.5 B pts/s | [Nsight Systems](robocache/artifacts/nsys/) |
-| Trajectory Resample | **0.184 ms** | 5,435 ops/s | [Benchmark CSV](robocache/bench/results/benchmark_h100_20251106_172811.csv) |
+| Trajectory Resample (8×250×128) | **0.184 ms** | 5,435 ops/s | [Benchmark CSV](robocache/bench/results/benchmark_h100_20251106_172811.csv) |
+| Trajectory Resample (32×500×256) | **2.605 ms** | 12,285 ops/s | [Benchmark CSV](robocache/bench/results/benchmark_h100_20251106_172811.csv) |
+| Trajectory Resample (64×1000×512) | **20.051 ms** | 3,193 ops/s | [Benchmark CSV](robocache/bench/results/benchmark_h100_20251106_172811.csv) |
 
-**Statistical Rigor:** 5 seeds × 50 repeats per measurement  
-**Profiling Tools:** Nsight Compute + Nsight Systems (reports in `artifacts/`)  
-**Validation:** [Full Report](docs/validation/H100_VALIDATION_COMPLETE.md)
+**Statistical Rigor:** 5 seeds × 50 repeats = 250 measurements per config  
+**Hardware:** NVIDIA H100 PCIe 81GB, CUDA 13.0, Driver 580.95  
+**Methodology:** `torch.cuda.Event` timing with warmup, CSV export  
+**Full Report:** [Benchmark Summary](robocache/bench/results/BENCHMARK_H100_SUMMARY.md)
 
 ### A100 Benchmarks
 
-| Operation | Latency (P50) | vs H100 |
-|-----------|---------------|---------|
-| Multimodal Fusion | **0.057 ms** | 0.32× |
-| Voxelization (500K pts) | **0.032 ms** | 0.44× |
+| Operation | Latency (P50) | Hardware |
+|-----------|---------------|----------|
+| Multimodal Fusion (3-stream) | **0.057 ms** | A100 SXM4 80GB |
+| Voxelization (occupancy, 500K pts) | **0.032 ms** | A100 SXM4 80GB |
 
-**Validation:** [A100 Report](docs/validation/A100_VALIDATION_COMPLETE.md)
+**Report:** [A100 Validation](docs/validation/A100_VALIDATION_COMPLETE.md)
 
 ### Architecture
 
