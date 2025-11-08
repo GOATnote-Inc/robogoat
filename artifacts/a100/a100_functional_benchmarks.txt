@@ -1,0 +1,60 @@
+================================================================================
+RoboCache A100 (SM80) Comprehensive Validation
+================================================================================
+GPU: NVIDIA A100-SXM4-80GB
+PyTorch: 2.9.0+cu128
+CUDA: 12.8
+RoboCache: 1.0.0
+================================================================================
+
+================================================================================
+1. TRAJECTORY RESAMPLING
+================================================================================
+
+[Trajectory Resampling (32x500→250, 256D, FP32)]
+  Iterations: 100
+  Mean latency: 0.0579 ms
+  P50 latency:  0.0573 ms
+  P99 latency:  0.0718 ms
+  Std dev:      0.0037 ms
+  Min:          0.0563 ms
+  Max:          0.0860 ms
+  Throughput:   138.05 M samples/sec
+
+================================================================================
+2. POINT CLOUD VOXELIZATION
+================================================================================
+
+[Voxelization (500K points → 128³ occupancy)]
+  Iterations: 100
+  Mean latency: 0.0411 ms
+  P50 latency:  0.0410 ms
+  P99 latency:  0.0461 ms
+  Std dev:      0.0014 ms
+  Min:          0.0399 ms
+  Max:          0.0481 ms
+  Throughput:   12.16 B points/sec
+
+================================================================================
+3. MULTIMODAL FUSION
+================================================================================
+
+[Multimodal Fusion (3 streams, batch=32, target=250)]
+  Iterations: 100
+  Mean latency: 0.0945 ms
+  P50 latency:  0.0932 ms
+  P99 latency:  0.1098 ms
+  Std dev:      0.0051 ms
+  Min:          0.0922 ms
+  Max:          0.1341 ms
+  Throughput:   84.64 M samples/sec
+
+================================================================================
+SUMMARY
+================================================================================
+Trajectory Resampling: 0.0579 ms @ 138.05 M samples/sec
+Voxelization:          0.0411 ms @ 12.16 B points/sec
+Multimodal Fusion:     0.0945 ms @ 84.64 M samples/sec
+================================================================================
+
+✅ All benchmarks complete - A100 (SM80) validated

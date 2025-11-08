@@ -6,8 +6,8 @@ This directory contains comprehensive GPU profiling data for RoboCache, validate
 
 | GPU | Architecture | CUDA | Status | Report |
 |-----|--------------|------|--------|--------|
-| **NVIDIA H100 PCIe** | SM90 (Hopper) | 13.0 | ✅ Validated | [H100 Report](h100/H100_NCU_NSIGHT_REPORT.md) |
-| **NVIDIA A100** | SM80 (Ampere) | 12.0 | ✅ Validated | [A100 Validation](../docs/validation/A100_SM80_VALIDATION.md) |
+| **NVIDIA H100 PCIe** | SM90 (Hopper) | 13.0 | ✅ Validated (NCU + Nsys) | [H100 Report](h100/H100_NCU_NSIGHT_REPORT.md) |
+| **NVIDIA A100-SXM4-80GB** | SM80 (Ampere) | 12.8 | ✅ Validated (Functional) | [A100 Report](a100/A100_VALIDATION_REPORT.md) |
 
 ---
 
@@ -45,7 +45,10 @@ artifacts/
 │       ├── robocache_h100_e2e.nsys-rep      # Nsight Systems timeline (4MB)
 │       ├── robocache_h100_e2e.sqlite        # SQLite database for analysis
 │       └── nsys_output.txt                  # Stats summary
-└── a100/                                     # A100 (SM80) profiling data (future)
+└── a100/                                     # A100 (SM80) profiling data
+    ├── A100_VALIDATION_REPORT.md            # Comprehensive validation report
+    ├── gpu_info.txt                         # GPU specs
+    └── a100_functional_benchmarks.txt       # Full benchmark output (100 iter)
 ```
 
 ---
@@ -62,23 +65,34 @@ artifacts/
 | **Memory BW** | 51.82% | 14.85% |
 | **Status** | ✅ Production-ready | ✅ Production-ready |
 
-### NVIDIA A100 (SM80)
+### NVIDIA A100-SXM4-80GB (SM80)
 
-| Metric | Voxelization | Trajectory Resampling |
-|--------|--------------|------------------------|
-| **P50 Latency** | 0.036 ms | 0.063 ms |
-| **Throughput** | 11.76 B points/sec | 126.27 M samples/sec |
-| **Memory Stability** | ✅ 0 MB growth (10K iter) | ✅ 0 MB growth (10K iter) |
-| **Status** | ✅ Production-ready | ✅ Production-ready |
+| Metric | Trajectory Resampling | Voxelization | Multimodal Fusion |
+|--------|------------------------|--------------|-------------------|
+| **P50 Latency** | 0.0573 ms | 0.0410 ms | 0.0932 ms |
+| **Mean Latency** | 0.0579 ms | 0.0411 ms | 0.0945 ms |
+| **P99 Latency** | 0.0718 ms | 0.0461 ms | 0.1098 ms |
+| **Throughput** | 138.05 M samples/sec | 12.16 B points/sec | 84.64 M samples/sec |
+| **Std Dev** | 0.0037 ms (6.4%) | 0.0014 ms (3.4%) | 0.0051 ms (5.4%) |
+| **Status** | ✅ Production-ready | ✅ Production-ready | ✅ Production-ready |
 
 ---
 
 ## 🔍 Viewing the Reports
 
+### Binary Reports (.ncu-rep, .nsys-rep)
+
+**Note:** Binary profiling reports (`.ncu-rep`, `.nsys-rep`) are excluded from git (22MB+ total) per best practices for GPU repositories. 
+
+**To access binary reports:**
+1. **Regenerate locally:** Run profiling scripts on your GPU (see Reproducibility section)
+2. **Download from CI artifacts:** Available in GitHub Actions workflow runs
+3. **Contact maintainers:** For access to archived profiling sessions
+
 ### NCU Reports (.ncu-rep)
 ```bash
-# Open in Nsight Compute GUI
-nsight-compute --import artifacts/h100/ncu_reports/robocache_h100_full.ncu-rep
+# After regenerating or downloading
+nsight-compute --import robocache_h100_full.ncu-rep
 
 # Or analyze via CLI
 ncu --import robocache_h100_full.ncu-rep --page details
@@ -86,11 +100,11 @@ ncu --import robocache_h100_full.ncu-rep --page details
 
 ### Nsight Systems Reports (.nsys-rep)
 ```bash
-# Open in Nsight Systems GUI
-nsys-ui artifacts/h100/nsys_reports/robocache_h100_e2e.nsys-rep
+# After regenerating or downloading
+nsys-ui robocache_h100_e2e.nsys-rep
 
 # Or export stats via CLI
-nsys stats --report cuda_api_sum,cuda_gpu_kern_sum artifacts/h100/nsys_reports/robocache_h100_e2e.nsys-rep
+nsys stats --report cuda_api_sum,cuda_gpu_kern_sum robocache_h100_e2e.nsys-rep
 ```
 
 ### CSV Metrics
