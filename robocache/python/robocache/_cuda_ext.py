@@ -29,6 +29,7 @@ def get_cuda_module():
     # Define sources
     sources = [
         os.path.join(kernel_dir, 'trajectory_resample_optimized_v2.cu'),
+        os.path.join(kernel_dir, 'trajectory_resample_optimized_v2_torch.cu'),
     ]
     
     # Check sources exist

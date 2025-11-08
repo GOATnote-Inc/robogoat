@@ -1,29 +1,65 @@
 """Public Python API for the open-source RoboCache reference package."""
 
+from __future__ import annotations
+
 __version__ = "0.1.0"
 
+import sys
 import warnings
-from typing import Literal, Optional
+from enum import Enum
+from functools import lru_cache
+from typing import Dict, Literal, Optional
 
 import torch
 
-
-_CUDA_MESSAGE = (
-    "CUDA kernels are not distributed in the open-source build. "
-    "Install the enterprise wheel to access GPU-accelerated backends."
-)
+from .backends.pytorch_backend import PyTorchBackend
 
 
-def _resolve_backend(backend: Optional[str]) -> Literal["pytorch"]:
-    """Return the only supported backend and surface CUDA requests clearly."""
+class BackendType(Enum):
+    CUDA = "cuda"
+    PYTORCH = "pytorch"
 
-    if backend is None or backend == "pytorch":
-        return "pytorch"
 
-    if backend == "cuda":
-        raise NotImplementedError(_CUDA_MESSAGE)
+@lru_cache(maxsize=1)
+def _cuda_extension_status() -> tuple[bool, Optional[str]]:
+    """Return whether the CUDA extension can be imported."""
 
-    raise ValueError(f"Unsupported backend '{backend}'. Expected 'pytorch'.")
+    if not torch.cuda.is_available():
+        return False, "CUDA runtime unavailable"
+
+    try:
+        from . import _cuda_ext
+
+        _cuda_ext.get_cuda_module()
+        return True, None
+    except Exception as exc:
+        return False, str(exc)
+
+
+def _select_backend(requested: Optional[str]) -> BackendType:
+    """Select a backend using local availability checks."""
+
+    normalized = requested.lower() if isinstance(requested, str) else None
+
+    cuda_ok, _ = _cuda_extension_status()
+
+    if normalized in {None, "auto"}:
+        if cuda_ok:
+            return BackendType.CUDA
+        return BackendType.PYTORCH
+
+    if normalized == "cuda":
+        if not cuda_ok:
+            _, error = _cuda_extension_status()
+            raise RuntimeError(
+                f"CUDA backend unavailable: {error}. Use backend='pytorch' instead."
+            )
+        return BackendType.CUDA
+
+    if normalized == "pytorch":
+        return BackendType.PYTORCH
+
+    raise ValueError(f"Unsupported backend '{requested}'. Expected 'cuda' or 'pytorch'.")
 
 def resample_trajectories(
     source_data: torch.Tensor,
@@ -52,15 +88,57 @@ def resample_trajectories(
     assert source_times.shape == (B, S), f"source_times shape mismatch"
     assert target_times.shape[0] == B, f"target_times batch mismatch"
     
-    backend = _resolve_backend(backend)
+    backend_choice = _select_backend(backend)
+
+    if backend_choice == BackendType.CUDA:
+        from . import _cuda_ext
+
+        module = _cuda_ext.get_cuda_module()
+
+        if not (source_data.is_cuda and source_times.is_cuda and target_times.is_cuda):
+            raise RuntimeError(
+                "CUDA backend requires all tensors on CUDA devices. "
+                "Use backend='pytorch' for CPU tensors."
+            )
+
+        if source_times.dtype != torch.float32 or target_times.dtype != torch.float32:
+            raise TypeError("CUDA backend expects FP32 timestamps")
+
+        original_dtype = source_data.dtype
+        if original_dtype not in (torch.bfloat16, torch.float32):
+            raise TypeError(
+                "CUDA backend supports float32 or bfloat16 source_data tensors"
+            )
+
+        # CUDA kernels are implemented in BF16. Allow FP32 inputs by down-casting and
+        # returning to the original dtype for convenience in tests and examples.
+        if original_dtype == torch.float32:
+            source_data_cast = source_data.to(torch.bfloat16)
+            convert_back = True
+        else:
+            source_data_cast = source_data
+            convert_back = False
+
+        result = module.resample_trajectories(
+            source_data_cast.contiguous(),
+            source_times.contiguous(),
+            target_times.contiguous(),
+        )
+
+        if convert_back:
+            result = result.to(original_dtype)
+
+        return result
 
     if source_data.is_cuda:
         warnings.warn(
-            "RoboCache currently executes the PyTorch reference implementation even on CUDA tensors.",
+            "Falling back to the PyTorch reference implementation on CUDA tensors.",
             RuntimeWarning,
         )
 
-    return _resample_pytorch(source_data, source_times, target_times)
+    return PyTorchBackend.resample_trajectories(
+        source_data, source_times, target_times
+    )
 
 def _resample_pytorch(source_data, source_times, target_times):
     """PyTorch fallback implementation"""
@@ -144,7 +222,11 @@ def voxelize_occupancy(
 ) -> torch.Tensor:
     """Voxelize a point cloud into a binary occupancy grid using PyTorch."""
 
-    _resolve_backend(backend)
+    if backend == "cuda":
+        raise NotImplementedError(
+            "CUDA voxelization kernels are unavailable in the reference build. "
+            "Pass backend='pytorch' to use the compatibility implementation."
+        )
 
     if origin is None:
         origin = torch.zeros(3, device=points.device)
@@ -190,14 +272,93 @@ def fuse_multimodal(
         [B, T, Dv+Dp+Df] fused features
     """
     # Resample each modality independently
-    backend = _resolve_backend(backend)
+    if backend == "cuda":
+        raise NotImplementedError(
+            "CUDA multimodal fusion kernels are unavailable in the reference build. "
+            "Pass backend='pytorch' to use the compatibility implementation."
+        )
 
-    v_aligned = resample_trajectories(vision_data, vision_times, target_times, backend)
-    p_aligned = resample_trajectories(proprio_data, proprio_times, target_times, backend)
-    f_aligned = resample_trajectories(force_data, force_times, target_times, backend)
-    
+    v_aligned = resample_trajectories(
+        vision_data, vision_times, target_times, backend
+    )
+    p_aligned = resample_trajectories(
+        proprio_data, proprio_times, target_times, backend
+    )
+    f_aligned = resample_trajectories(
+        force_data, force_times, target_times, backend
+    )
+
     # Concatenate
     return torch.cat([v_aligned, p_aligned, f_aligned], dim=2)
+
+
+def check_installation() -> Dict[str, Optional[str]]:
+    """Return backend availability information used by tests and docs."""
+
+    info: Dict[str, Optional[str]] = {
+        "pytorch_available": False,
+        "pytorch_version": None,
+        "cuda_extension_available": False,
+        "cuda_extension_error": None,
+        "default_backend": None,
+        "triton_available": False,
+        "triton_error": None,
+    }
+
+    try:
+        info["pytorch_available"] = True
+        info["pytorch_version"] = torch.__version__
+        info["cuda_runtime_available"] = torch.cuda.is_available()
+    except Exception as exc:  # pragma: no cover - defensive
+        info["pytorch_error"] = str(exc)
+        info["cuda_runtime_available"] = False
+        return info
+
+    cuda_ok, cuda_error = _cuda_extension_status()
+    info["cuda_extension_available"] = cuda_ok
+    info["cuda_extension_error"] = cuda_error
+
+    if cuda_ok:
+        info["default_backend"] = BackendType.CUDA.value
+    elif info["pytorch_available"]:
+        info["default_backend"] = BackendType.PYTORCH.value
+    else:
+        info["default_backend_error"] = "PyTorch not installed"
+
+    return info
+
+
+def print_installation_info(stream=None) -> None:
+    """Pretty-print installation diagnostics for README examples."""
+
+    info = check_installation()
+    out = stream or sys.stdout
+
+    print("=" * 60, file=out)
+    print("RoboCache Installation Diagnostics", file=out)
+    print("=" * 60, file=out)
+
+    print(f"PyTorch: {'✓ ' + info['pytorch_version'] if info['pytorch_available'] else '✗'}", file=out)
+
+    cuda_status = "✓ Available" if info["cuda_extension_available"] else f"✗ {info['cuda_extension_error']}"
+    print(f"CUDA Extension: {cuda_status}", file=out)
+
+    if "cuda_runtime_available" in info:
+        runtime_state = "✓" if info["cuda_runtime_available"] else "✗"
+        print(f"CUDA Runtime: {runtime_state}", file=out)
+
+    if info["default_backend"]:
+        print(f"Default Backend: {info['default_backend']}", file=out)
+    elif "default_backend_error" in info:
+        print(f"Default Backend: ✗ {info['default_backend_error']}", file=out)
+
+    if info["triton_available"]:
+        print("Triton: ✓ Available", file=out)
+    elif info["triton_error"]:
+        print(f"Triton: ✗ {info['triton_error']}", file=out)
+
+    print("=" * 60, file=out)
+
 
 __all__ = [
     "resample_trajectories",
