@@ -6,6 +6,16 @@
 
 ---
 
+## Build Variants
+
+| Variant | Build Flag | Default Backend | Intended Users | Notes |
+|---------|------------|-----------------|----------------|-------|
+| **PyTorch Reference** | *(none)* | PyTorch (CPU/GPU tensors) | Open-source users, CI, unit tests | Ships in this repo. No CUDA runtime required. |
+| **CUDA Extension (optional)** | `ROBOCACHE_ENABLE_CUDA_BACKEND=1` (or `ROBOCACHE_BUILD_WITH_CUDA=1`) | CUDA (falls back to PyTorch if compilation fails) | Enterprise / GPU users with NVCC + CUTLASS | Requires CUDA Toolkit ≥13.0, CUTLASS 4.3.0 headers, compatible NVIDIA GPU. |
+
+The CUDA extension is not bundled with the open-source release; the build flag must be exported before running `pip install -e
+python/`. Without it, RoboCache never attempts to compile or load CUDA kernels.
+
 ## Validated GPU SKUs
 
 | GPU | Architecture | Compute Cap | Memory | Status | Validation Date |

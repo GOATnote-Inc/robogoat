@@ -31,6 +31,18 @@ RoboCache eliminates data preprocessing as the bottleneck in robot learning by p
 - **Enterprise GPU build:** Includes CUTLASS/CUDA kernels, Nsight profiles, and deployment automation. References to CUDA
   performance throughout this README describe the enterprise release for transparency.
 
+## 🧮 Backend Support Matrix
+
+| Mode | Default | Build Flag | Required Dependencies | Notes |
+|------|---------|------------|-----------------------|-------|
+| **PyTorch reference (CPU/GPU tensors)** | ✅ Yes | *(none)* | Python ≥3.10, `pip install -e python/` (installs PyTorch CPU wheels by default) | Ships in this repository. Works on machines without NVIDIA drivers. |
+| **Optional CUDA extension (enterprise / power users)** | ❌ No | `ROBOCACHE_ENABLE_CUDA_BACKEND=1` (or `ROBOCACHE_BUILD_WITH_CUDA=1`) must be set **during install** | CUDA Toolkit ≥13.0, NVCC, CUTLASS 4.3.0 headers, compatible NVIDIA GPU (H100 validated, A100 supported) | Not bundled in the open-source release. Build fails fast with a clear error when prerequisites are missing. |
+
+The Python package now requires you to opt-in explicitly before any CUDA assets are touched. Without the flag, backend auto
+selection always returns the PyTorch reference path, and the package never attempts to compile or import missing CUDA
+extensions. When the flag is enabled, RoboCache will try to build the extension at import time and report clear diagnostics if
+the environment is incomplete (e.g., NVCC not found, CUTLASS headers missing).
+
 ## 💡 The Problem
 
 Training robot foundation models (like NVIDIA's GR00T) on heterogeneous datasets is painfully slow, not because of compute, but because of **data preprocessing**:
@@ -106,35 +118,34 @@ in PyTorch. CUDA implementations for occupancy, density, and feature pooling shi
 
 ### Requirements
 
-> The steps below outline the enterprise GPU workflow for completeness. The open-source reference build only requires the
-> PyTorch-only instructions.
+**Reference install (default):**
+- Python **3.10+**
+- PyTorch **2.0+** (CPU wheels are fine)
+- `pip install -e python/`
 
-**For Production (CUDA backend - GPU-accelerated, enterprise build):**
-- **CUDA**: 13.0+ (12.1+ also supported)
-- **PyTorch**: 2.0+ with CUDA support
-- **CMake**: 3.18+
-- **GPU**: NVIDIA H100 (validated), A100 and others supported
-
-**For Development/Testing (PyTorch fallback - slower):**
-- **PyTorch**: 2.0+ (CPU or GPU)
+**Opt-in CUDA build (requires the flag):**
+- Set `ROBOCACHE_ENABLE_CUDA_BACKEND=1` (or `ROBOCACHE_BUILD_WITH_CUDA=1`) **before** installing RoboCache
+- CUDA Toolkit **13.0+** with NVCC on `PATH`
+- Compatible NVIDIA GPU (H100 validated, A100 supported)
+- CUTLASS **4.3.0** headers available on the include path
+- PyTorch **2.0+** with CUDA support
 
 ### Quick Start (Full Installation - Enterprise build)
 
 ```bash
-# 1. Install CUTLASS 4.3.0 (main branch, Oct 2025 release)
+# 1. Install CUTLASS 4.3.0 headers (enterprise/local build)
 git clone https://github.com/NVIDIA/cutlass.git
-cd cutlass
-git checkout main  # v4.3.0 is on main branch (not tagged yet)
+cd cutlass && git checkout main  # v4.3.0 is on main branch (not tagged yet)
 sudo cp -r include/cutlass /usr/local/include/
 
-# 2. Build RoboCache with CUDA
-cd robocache
-mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES="80;90"  # A100 + H100
-make -j$(nproc)
+# 2. Export the build flag **before** installing RoboCache
+export ROBOCACHE_ENABLE_CUDA_BACKEND=1
 
-# 3. Install Python package
-cd ..
+# 3. Build the CUDA extension (requires NVCC + compatible GPU)
+cd robocache
+python setup_cuda.py build_ext --inplace
+
+# 4. Install the Python package (keeps the built extension on disk)
 pip install -e python/
 ```
 
