@@ -166,3 +166,32 @@ template cudaError_t resample_trajectories_production<__half>(
 
 }}} // namespace robocache::kernels::production
 
+// Export C interface for PyBind11
+extern "C" {
+
+cudaError_t launch_trajectory_resample_optimized(
+    const void* source_data,
+    const float* source_times,
+    const float* target_times,
+    void* output_data,
+    int batch_size,
+    int source_length,
+    int target_length,
+    int action_dim,
+    cudaStream_t stream
+) {
+    return robocache::kernels::production::resample_trajectories_production(
+        static_cast<const __nv_bfloat16*>(source_data),
+        source_times,
+        target_times,
+        static_cast<__nv_bfloat16*>(output_data),
+        batch_size,
+        source_length,
+        target_length,
+        action_dim,
+        stream
+    );
+}
+
+}  // extern "C"
+
