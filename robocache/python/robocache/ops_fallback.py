@@ -33,6 +33,29 @@ def resample_single_stream_cpu(
     return _interpolate_stream(source_data, source_times, target_times)
 
 
+def resample_trajectories_cpu(
+    vision: torch.Tensor,
+    vision_times: torch.Tensor,
+    proprio: torch.Tensor,
+    proprio_times: torch.Tensor,
+    imu: torch.Tensor,
+    imu_times: torch.Tensor,
+    target_times: torch.Tensor
+) -> torch.Tensor:
+    """
+    Alias for fuse_multimodal_cpu to maintain backwards compatibility.
+    
+    This function name is used by benchmark scripts. It calls the same
+    underlying multimodal fusion implementation.
+    """
+    return fuse_multimodal_cpu(
+        vision, vision_times,
+        proprio, proprio_times,
+        imu, imu_times,
+        target_times
+    )
+
+
 def fuse_multimodal_cpu(
     vision: torch.Tensor,
     vision_times: torch.Tensor,
