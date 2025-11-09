@@ -1,0 +1,218 @@
+name: Benchmark Validation
+
+on:
+  schedule:
+    # Run weekly on Mondays at 00:00 UTC
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+    inputs:
+      baseline_threshold:
+        description: 'Minimum throughput (ops/sec)'
+        required: false
+        default: '100000'
+
+# Validates that performance doesn't regress below baseline
+jobs:
+  benchmark-gpu:
+    name: GPU Performance Baseline
+    runs-on: self-hosted
+    
+    # Only run on manual dispatch or scheduled runs
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    
+    environment:
+      name: gpu-runners
+    
+    env:
+      CUDA_VISIBLE_DEVICES: 0
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: System Info
+        run: |
+          echo "=== Hardware Info ==="
+          nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader
+          nvcc --version | grep "release"
+          python3 --version
+      
+      - name: Setup Environment
+        run: |
+          cd ${{ github.workspace }}/robocache
+          export LD_LIBRARY_PATH=$(python3 -c "import torch, os; print(os.path.join(os.path.dirname(torch.__file__), 'lib'))"):$LD_LIBRARY_PATH
+          pip install -e . --no-build-isolation
+      
+      - name: Run Smoke Test (Quick Validation)
+        id: smoke
+        run: |
+          cd ${{ github.workspace }}/robocache
+          
+          THRESHOLD=${{ github.event.inputs.baseline_threshold || '100000' }}
+          
+          echo "=== Running Smoke Test ==="
+          echo "Minimum throughput threshold: $THRESHOLD ops/sec"
+          
+          python3 benchmarks/smoke.py --assert-min-throughput $THRESHOLD 2>&1 | tee smoke_test.log
+          
+          if [ $? -ne 0 ]; then
+            echo "❌ Smoke test failed - performance below baseline"
+            exit 1
+          fi
+          
+          echo "✅ Smoke test passed"
+      
+      - name: Run Comprehensive Benchmarks
+        id: benchmarks
+        continue-on-error: true
+        run: |
+          cd ${{ github.workspace }}/robocache
+          
+          echo "=== Running Comprehensive Benchmarks ==="
+          
+          # Create output directory
+          mkdir -p bench/results
+          
+          # Run benchmark harness
+          python3 bench/benchmark_harness.py \
+            --output bench/results/benchmark_baseline_$(date +%Y%m%d).csv \
+            --seeds 42 123 456 \
+            --repeats 50 2>&1 | tee benchmark.log
+          
+          echo "✅ Benchmarks completed"
+      
+      - name: Analyze Results
+        id: analysis
+        run: |
+          cd ${{ github.workspace }}/robocache
+          
+          echo "=== Performance Analysis ==="
+          
+          python3 << 'EOF'
+          import csv
+          import sys
+          from pathlib import Path
+          
+          # Find most recent CSV
+          results_dir = Path("bench/results")
+          csv_files = list(results_dir.glob("benchmark_baseline_*.csv"))
+          
+          if not csv_files:
+              print("⚠️  No benchmark CSV found")
+              sys.exit(0)
+          
+          latest_csv = max(csv_files, key=lambda p: p.stat().st_mtime)
+          print(f"Analyzing: {latest_csv}\n")
+          
+          # Parse results
+          with open(latest_csv, 'r') as f:
+              reader = csv.DictReader(f)
+              rows = list(reader)
+          
+          print("=== Benchmark Summary ===\n")
+          print(f"{'Operation':<30} {'Mean (ms)':<12} {'Throughput':>15}")
+          print("-" * 60)
+          
+          for row in rows:
+              op = row.get('operation', 'unknown')
+              mean_ms = float(row.get('mean_ms', 0))
+              throughput = row.get('throughput_ops_per_sec', 'N/A')
+              print(f"{op:<30} {mean_ms:>10.4f}  {throughput:>15}")
+          
+          print("\n✅ Analysis complete")
+          EOF
+      
+      - name: Compare with Baseline
+        id: regression
+        run: |
+          cd ${{ github.workspace }}/robocache
+          
+          echo "=== Regression Check ==="
+          
+          # Define baseline thresholds (ops/sec)
+          # These are conservative minimums based on H100 validation
+          BASELINE_TRAJECTORY=20000      # 28,300 measured
+          BASELINE_MULTIMODAL=25000      # 29,500 measured
+          BASELINE_VOXELIZATION=20000    # High throughput
+          
+          echo "Baseline thresholds:"
+          echo "  Trajectory: $BASELINE_TRAJECTORY ops/sec"
+          echo "  Multimodal: $BASELINE_MULTIMODAL ops/sec"
+          echo "  Voxelization: $BASELINE_VOXELIZATION ops/sec"
+          
+          # Extract throughput from smoke test log
+          ACTUAL=$(grep "Throughput:" smoke_test.log | awk '{print $2}' || echo "0")
+          
+          echo ""
+          echo "Actual throughput: $ACTUAL ops/sec"
+          
+          if [ "$ACTUAL" -lt "$THRESHOLD" ]; then
+            echo "❌ REGRESSION DETECTED"
+            echo "   Actual: $ACTUAL ops/sec"
+            echo "   Baseline: $THRESHOLD ops/sec"
+            exit 1
+          fi
+          
+          echo "✅ No regression detected"
+      
+      - name: Create Performance Report
+        if: always()
+        run: |
+          cd ${{ github.workspace }}/robocache
+          
+          cat > performance_report.md << 'MDEOF'
+          # Performance Validation Report
+          
+          **Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          **Commit:** ${{ github.sha }}
+          **Workflow:** ${{ github.workflow }} #${{ github.run_number }}
+          
+          ## Summary
+          
+          - **Smoke Test:** ${{ steps.smoke.outcome }}
+          - **Benchmarks:** ${{ steps.benchmarks.outcome }}
+          - **Analysis:** ${{ steps.analysis.outcome }}
+          - **Regression Check:** ${{ steps.regression.outcome }}
+          
+          ## Hardware
+          
+          ```
+          $(nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader)
+          ```
+          
+          ## Smoke Test Results
+          
+          ```
+          $(cat smoke_test.log || echo "No smoke test log")
+          ```
+          
+          ## Benchmark Results
+          
+          See attached CSV artifact for detailed metrics.
+          
+          ## Status
+          
+          ${{ steps.regression.outcome == 'success' && '✅ Performance within baseline thresholds' || '❌ Performance regression detected' }}
+          MDEOF
+          
+          cat performance_report.md
+      
+      - name: Upload Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-results-${{ github.run_number }}
+          path: |
+            ${{ github.workspace }}/robocache/bench/results/*.csv
+            ${{ github.workspace }}/robocache/smoke_test.log
+            ${{ github.workspace }}/robocache/benchmark.log
+            ${{ github.workspace }}/robocache/performance_report.md
+          retention-days: 90
+      
+      - name: Fail if regression detected
+        if: steps.regression.outcome != 'success'
+        run: |
+          echo "❌ Performance regression detected"
+          echo "See performance_report.md for details"
+          exit 1
+
