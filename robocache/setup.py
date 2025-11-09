@@ -35,7 +35,7 @@ cuda_compile_args = {
 
 if "--no-cuda" not in sys.argv:
     try:
-        # Trajectory resampling extension
+        # Reference kernels (baseline implementations)
         ext_modules.append(CUDAExtension(
             name='robocache._cuda_ops',
             sources=[
@@ -46,7 +46,6 @@ if "--no-cuda" not in sys.argv:
             extra_compile_args=cuda_compile_args
         ))
         
-        # Multimodal fusion extension
         ext_modules.append(CUDAExtension(
             name='robocache._multimodal_ops',
             sources=[
@@ -57,7 +56,6 @@ if "--no-cuda" not in sys.argv:
             extra_compile_args=cuda_compile_args
         ))
         
-        # Voxelization extension
         ext_modules.append(CUDAExtension(
             name='robocache._voxelize_ops',
             sources=[
@@ -68,7 +66,25 @@ if "--no-cuda" not in sys.argv:
             extra_compile_args=cuda_compile_args
         ))
         
-        print(f"✓ Building {len(ext_modules)} CUDA extensions")
+        # CUTLASS-optimized kernels (H100/A100 production)
+        # These are the high-performance implementations validated on H100
+        ext_modules.append(CUDAExtension(
+            name='robocache._cutlass_ops',
+            sources=[
+                'csrc/cpp/cutlass_ops.cpp',
+                'kernels/cutlass/trajectory_resample_production.cu',
+            ],
+            include_dirs=[
+                'csrc/cpp', 
+                'csrc/cuda', 
+                'kernels/cutlass'
+            ],
+            extra_compile_args=cuda_compile_args
+        ))
+        
+        print(f"✓ Building {len(ext_modules)} CUDA extensions (including CUTLASS)")
+        print(f"  - Reference kernels: 3")
+        print(f"  - CUTLASS optimized: 1")
         
     except Exception as e:
         print(f"WARNING: CUDA extension build failed: {e}")
