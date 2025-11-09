@@ -90,11 +90,29 @@ resample_bf16_persistent_kernel(
             const Element* src_right = src_base + right_idx * action_dim;
             Element* dst = out_base + t * action_dim;
             
-            for (int d = 0; d < action_dim; d++) {
-                float val_left = static_cast<float>(src_left[d]);
-                float val_right = static_cast<float>(src_right[d]);
-                dst[d] = static_cast<Element>(fmaf(weight, val_right - val_left, val_left));
-            }
+              for (int d = 0; d < action_dim; d++) {
+                  float val_left, val_right;
+                  if constexpr (std::is_same_v<Element, __nv_bfloat16>) {
+                      val_left = __bfloat162float(src_left[d]);
+                      val_right = __bfloat162float(src_right[d]);
+                  } else if constexpr (std::is_same_v<Element, __half>) {
+                      val_left = __half2float(src_left[d]);
+                      val_right = __half2float(src_right[d]);
+                  } else {
+                      val_left = static_cast<float>(src_left[d]);
+                      val_right = static_cast<float>(src_right[d]);
+                  }
+                  
+                  float result = fmaf(weight, val_right - val_left, val_left);
+                  
+                  if constexpr (std::is_same_v<Element, __nv_bfloat16>) {
+                      dst[d] = __float2bfloat16_rn(result);
+                  } else if constexpr (std::is_same_v<Element, __half>) {
+                      dst[d] = __float2half_rn(result);
+                  } else {
+                      dst[d] = static_cast<Element>(result);
+                  }
+              }
         }
         __syncthreads();
     }
