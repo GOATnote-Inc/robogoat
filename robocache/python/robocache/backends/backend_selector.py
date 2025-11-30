@@ -5,6 +5,7 @@ Automatically selects the best available backend or allows manual override.
 Priority: CUDA > PyTorch (GPU) > PyTorch (CPU)
 """
 
+from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 import warnings
@@ -15,6 +16,15 @@ class BackendType(Enum):
     CUDA = "cuda"
     PYTORCH = "pytorch"
     AUTO = "auto"
+
+
+@dataclass
+class BackendStatus:
+    """Summary of backend availability and any CUDA import errors."""
+
+    cuda_available: bool
+    pytorch_available: bool
+    cuda_error: Optional[str] = None
 
 
 class BackendSelector:
@@ -46,6 +56,15 @@ class BackendSelector:
     @property
     def pytorch_available(self) -> bool:
         return self._torch_available
+
+    def status(self) -> BackendStatus:
+        """Return a snapshot of backend availability and any CUDA errors."""
+
+        return BackendStatus(
+            cuda_available=self._cuda_available,
+            pytorch_available=self._torch_available,
+            cuda_error=self._cuda_import_error,
+        )
     
     def select_backend(self, backend: Optional[str] = None) -> BackendType:
         """
@@ -87,7 +106,7 @@ class BackendSelector:
         
         else:
             raise ValueError(
-                f"Unknown backend: {backend}\n"
+                f"Invalid backend: {backend}\n"
                 f"Supported backends: 'cuda', 'pytorch', 'auto'"
             )
     
@@ -139,4 +158,10 @@ def is_cuda_available() -> bool:
 def is_pytorch_available() -> bool:
     """Check if PyTorch backend is available"""
     return _selector.pytorch_available
+
+
+def get_backend_status() -> BackendStatus:
+    """Return availability information for all backends."""
+
+    return _selector.status()
 

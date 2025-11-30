@@ -12,6 +12,7 @@ from typing import Dict, Literal, Optional
 import torch
 
 from ._version import __api_version__, __version__, __version_info__
+from .backends import get_backend_status
 from .backends.pytorch_backend import PyTorchBackend
 
 
@@ -182,6 +183,27 @@ def resample_trajectories(
         source_data, source_times, target_times
     )
 
+
+def get_backend_info() -> Dict[str, Dict[str, Dict[str, Optional[str]]]]:
+    """Return backend availability details for diagnostics."""
+
+    status = get_backend_status()
+    default_backend = _select_backend(None)
+
+    return {
+        "backends": {
+            "cuda": {
+                "available": status.cuda_available,
+                "error": status.cuda_error,
+            },
+            "pytorch": {
+                "available": status.pytorch_available,
+                "error": None,
+            },
+        },
+        "default_backend": default_backend.value,
+    }
+
 def _resample_pytorch(source_data, source_times, target_times):
     """PyTorch fallback implementation"""
     B, S, D = source_data.shape
@@ -273,28 +295,28 @@ def voxelize_occupancy(
     if origin is None:
         origin = torch.zeros(3, device=points.device)
 
-    X, Y, Z = grid_size
-    grid = torch.zeros(X, Y, Z, device=points.device)
+    if backend in {None, "pytorch"}:
+        grid_tensor = grid_size if isinstance(grid_size, torch.Tensor) else torch.tensor(grid_size, device=points.device)
+        return PyTorchBackend.voxelize_occupancy(
+            points, grid_tensor, voxel_size, origin
+        )
 
-    for i in range(points.shape[0]):
-        p = points[i]
-        x = int((p[0] - origin[0]) / voxel_size)
-        y = int((p[1] - origin[1]) / voxel_size)
-        z = int((p[2] - origin[2]) / voxel_size)
+    if backend == "cuda":
+        raise NotImplementedError(
+            "CUDA voxelization kernels are unavailable in the reference build. "
+            "Pass backend='pytorch' to use the compatibility implementation."
+        )
 
-        if 0 <= x < X and 0 <= y < Y and 0 <= z < Z:
-            grid[x, y, z] = 1.0
-
-    return grid
+    raise ValueError("Unsupported backend for voxelization")
 
 def fuse_multimodal(
     vision_data: torch.Tensor,
     vision_times: torch.Tensor,
     proprio_data: torch.Tensor,
     proprio_times: torch.Tensor,
-    force_data: torch.Tensor,
-    force_times: torch.Tensor,
-    target_times: torch.Tensor,
+    force_data: Optional[torch.Tensor] = None,
+    force_times: Optional[torch.Tensor] = None,
+    target_times: Optional[torch.Tensor] = None,
     backend: Optional[Literal["cuda", "pytorch"]] = None
 ) -> torch.Tensor:
     """
@@ -305,10 +327,10 @@ def fuse_multimodal(
         vision_times: [B, Sv] vision timestamps
         proprio_data: [B, Sp, Dp] proprioception
         proprio_times: [B, Sp] proprio timestamps
-        force_data: [B, Sf, Df] force/torque
-        force_times: [B, Sf] force timestamps
-        target_times: [B, T] target timestamps
-        backend: "cuda" or "pytorch"
+        force_data: [B, Sf, Df] force/torque (optional)
+        force_times: [B, Sf] force timestamps (optional)
+        target_times: [B, T] target timestamps (defaults to vision_times)
+        backend: "cuda" or "pytorch" (defaults to auto selection)
         
     Returns:
         [B, T, Dv+Dp+Df] fused features
@@ -320,18 +342,26 @@ def fuse_multimodal(
             "Pass backend='pytorch' to use the compatibility implementation."
         )
 
-    v_aligned = resample_trajectories(
-        vision_data, vision_times, target_times, backend
-    )
-    p_aligned = resample_trajectories(
-        proprio_data, proprio_times, target_times, backend
-    )
-    f_aligned = resample_trajectories(
-        force_data, force_times, target_times, backend
-    )
+    target = target_times if target_times is not None else vision_times
 
-    # Concatenate
-    return torch.cat([v_aligned, p_aligned, f_aligned], dim=2)
+    if backend in {None, "pytorch"}:
+        return PyTorchBackend.fused_multimodal_alignment(
+            vision_data,
+            vision_times,
+            proprio_data,
+            proprio_times,
+            force_data,
+            force_times,
+            target,
+        )
+
+    if backend == "cuda":
+        raise NotImplementedError(
+            "CUDA multimodal fusion kernels are unavailable in the reference build. "
+            "Pass backend='pytorch' to use the compatibility implementation."
+        )
+
+    raise ValueError("Unsupported backend for multimodal fusion")
 
 
 def check_installation() -> Dict[str, Optional[str]]:
@@ -414,4 +444,5 @@ __all__ = [
     "voxelize_point_cloud",
     "voxelize_occupancy",
     "fuse_multimodal",
+    "get_backend_info",
 ]

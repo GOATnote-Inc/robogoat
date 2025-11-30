@@ -172,8 +172,37 @@ class PyTorchBackend:
         
         # Concatenate along feature dimension
         fused = torch.cat([primary_data, aligned_secondary], dim=2)
-        
+
         return fused
+
+    @staticmethod
+    def fused_multimodal_alignment(
+        vision_data: torch.Tensor,
+        vision_times: torch.Tensor,
+        proprio_data: torch.Tensor,
+        proprio_times: torch.Tensor,
+        force_data: Optional[torch.Tensor],
+        force_times: Optional[torch.Tensor],
+        target_times: torch.Tensor,
+    ) -> torch.Tensor:
+        """Align and fuse multiple modalities using PyTorch operations."""
+
+        vision_resampled = PyTorchBackend.resample_trajectories(
+            vision_data, vision_times, target_times
+        )
+        proprio_resampled = PyTorchBackend.resample_trajectories(
+            proprio_data, proprio_times, target_times
+        )
+
+        if force_data is not None and force_times is not None:
+            force_resampled = PyTorchBackend.resample_trajectories(
+                force_data, force_times, target_times
+            )
+            return torch.cat(
+                [vision_resampled, proprio_resampled, force_resampled], dim=-1
+            )
+
+        return torch.cat([vision_resampled, proprio_resampled], dim=-1)
     
     @staticmethod
     def voxelize_occupancy(
@@ -202,9 +231,26 @@ class PyTorchBackend:
             This is EXTREMELY slow compared to CUDA (500-1000x slower).
             Only use for testing/development on small grids.
         """
+        if voxel_size <= 0:
+            raise ValueError("voxel_size must be positive")
+
+        if points.dim() not in (2, 3):
+            raise ValueError("points must be [N,3] or [B,N,3]")
+
+        single_batch = False
+        if points.dim() == 2:
+            points = points.unsqueeze(0)
+            single_batch = True
+
         batch_size, num_points, _ = points.shape
-        depth, height, width = grid_size[0].item(), grid_size[1].item(), grid_size[2].item()
-        
+        if isinstance(grid_size, torch.Tensor):
+            depth, height, width = [int(dim) for dim in grid_size]
+        else:
+            depth, height, width = grid_size
+
+        if depth <= 0 or height <= 0 or width <= 0:
+            raise ValueError("grid_size dimensions must be positive")
+
         device = points.device
         voxel_grid = torch.zeros(
             (batch_size, depth, height, width),
@@ -217,7 +263,7 @@ class PyTorchBackend:
             batch_points = points[b]  # [num_points, 3]
             
             # Convert points to voxel indices
-            voxel_indices = torch.floor((batch_points - origin) / voxel_size).long()
+            voxel_indices = torch.round((batch_points - origin) / voxel_size).long()
             
             # Filter out-of-bounds points
             valid_mask = (
@@ -235,6 +281,9 @@ class PyTorchBackend:
                     valid_indices[:, 1],
                     valid_indices[:, 2]
                 ] = 1.0
-        
+
+        if single_batch:
+            return voxel_grid.squeeze(0)
+
         return voxel_grid
 

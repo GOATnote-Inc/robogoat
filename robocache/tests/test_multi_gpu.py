@@ -38,7 +38,7 @@ class TestDeviceSafety:
         device_id = 0
         points = torch.randn(2, 100, 3, device=f'cuda:{device_id}')
         grid_size = torch.tensor([32, 32, 32], dtype=torch.int32, device=f'cuda:{device_id}')
-        origin = torch::zeros(3, device=f'cuda:{device_id}')
+        origin = torch.zeros(3, device=f'cuda:{device_id}')
         
         result = robocache_cuda.voxelize_occupancy(
             points, grid_size, 0.1, origin
