@@ -60,11 +60,10 @@ def cpu_golden_voxelize_occupancy(points, grid_size, voxel_size, origin):
         for p in range(num_points):
             px, py, pz = points_cpu[b, p, 0].item(), points_cpu[b, p, 1].item(), points_cpu[b, p, 2].item()
             
-            # Convert to voxel indices (using floor, matching CUDA __float2int_rd)
-            import math
-            vx = int(math.floor((px - origin_cpu[0].item()) / voxel_size))
-            vy = int(math.floor((py - origin_cpu[1].item()) / voxel_size))
-            vz = int(math.floor((pz - origin_cpu[2].item()) / voxel_size))
+            # Convert to voxel indices (round to nearest voxel center)
+            vx = int(round((px - origin_cpu[0].item()) / voxel_size))
+            vy = int(round((py - origin_cpu[1].item()) / voxel_size))
+            vz = int(round((pz - origin_cpu[2].item()) / voxel_size))
             
             # Check bounds
             if 0 <= vx < depth and 0 <= vy < height and 0 <= vz < width:
