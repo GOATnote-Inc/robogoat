@@ -11,5 +11,5 @@ Test organization:
 - test_api.py: API stability and error handling
 """
 
-__version__ = "0.2.1"
+__version__ = "1.0.0"
 

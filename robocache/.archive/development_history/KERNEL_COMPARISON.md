@@ -1,6 +1,5 @@
 # Kernel Performance Comparison & Usage Guidelines
 
-**Author:** RoboCache Team (Expert CUDA/NVIDIA Engineering)  
 **Last Updated:** November 5, 2025  
 **Hardware:** NVIDIA H100 (Hopper, SM 90)
 

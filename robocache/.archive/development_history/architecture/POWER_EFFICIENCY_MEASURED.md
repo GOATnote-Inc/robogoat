@@ -1,6 +1,5 @@
 # Power Efficiency Analysis - MEASURED on H100
 
-**Expert Profile:** 15+ years NVIDIA/CUDA experience  
 **Date:** November 4, 2025  
 **GPU:** NVIDIA H100 PCIe  
 **Method:** nvidia-smi power monitoring during real workload  

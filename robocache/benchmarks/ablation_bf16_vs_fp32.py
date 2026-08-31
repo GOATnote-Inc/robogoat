@@ -2,7 +2,6 @@
 Ablation Study: BF16 vs FP32 for Point Cloud Voxelization
 ===========================================================
 
-Expert CUDA Engineer Analysis:
 - Measure accuracy degradation (max/mean/RMS error)
 - Quantify throughput gains (latency, bandwidth)
 - Memory footprint comparison
@@ -198,7 +197,6 @@ def ablation_bf16_vs_fp32():
     """
     print("╔══════════════════════════════════════════════════════════════════════════════════╗")
     print("║  Ablation Study: BF16 vs FP32 for Point Cloud Voxelization")
-    print("║  Expert CUDA Engineer Analysis (15+ years experience)")
     print("╚══════════════════════════════════════════════════════════════════════════════════╝")
     print("")
     

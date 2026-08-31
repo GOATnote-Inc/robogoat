@@ -1,13 +1,13 @@
 # Known Limitations & Performance Envelope
 
 **Last Updated:** November 8, 2025  
-**Status:** Production-ready with documented constraints
+**Status:** Archived August 2026; constraints below reflect the November 2025 validation
 
 ---
 
 ## Performance Envelope
 
-###  Where RoboCache WINS (10-100× vs CPU)
+### Where RoboCache WINS (3.8-110x vs CPU, config-dependent)
 
 **Workload Profile:**
 - Robotics sensor data (30-200 Hz streams)
@@ -18,9 +18,11 @@
 
 | Config (B×S→T×D) | H100 Latency | PyTorch CPU | Speedup |
 |------------------|--------------|-------------|---------|
-| 8×250→128×128    | 0.184 ms     | ~20 ms      | ~108×   |
-| 32×500→256×256   | 2.605 ms     | ~150 ms     | ~57×    |
-| 64×1000→512×512  | 20.051 ms    | ~1200 ms    | ~60×    |
+| 8×250→128×128    | 0.184 ms     | 20.14 ms    | ~110×   |
+| 32×500→256×256   | 2.605 ms     | 38.39 ms    | ~15×    |
+| 64×1000→512×512  | 20.051 ms    | 75.69 ms    | ~3.8×   |
+
+(P50 values from `robocache/bench/results/benchmark_h100_20251106_172811.csv`.)
 
 **Why We Win:**
 - L1-resident timestamp arrays (99%+ cache hit rate)

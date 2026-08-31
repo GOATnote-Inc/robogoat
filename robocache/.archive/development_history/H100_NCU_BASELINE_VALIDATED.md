@@ -3,7 +3,6 @@
 **Date:** November 5, 2025  
 **GPU:** NVIDIA H100 PCIe (80GB, SM90)  
 **Kernel:** `trajectory_resample_optimized` (shared memory + vectorization)  
-**Analyst:** Expert CUDA/NVIDIA Engineer (15+ years)  
 **Status:** ✅ **VALIDATED ON H100**
 
 ---
@@ -204,7 +203,6 @@ smsp__inst_executed.avg.per_cycle_active \
 
 ## Expert Sign-Off
 
-This analysis reflects 15+ years of NVIDIA/CUDA optimization experience.
 
 **Verdict:** The kernel is performing **optimally** for its problem size. Further optimization  
 should focus on **scalability** and **end-to-end pipeline integration**, not isolated DRAM  

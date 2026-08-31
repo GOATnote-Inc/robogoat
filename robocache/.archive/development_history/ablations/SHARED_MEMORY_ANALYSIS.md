@@ -1,6 +1,5 @@
 # Ablation Study: Shared Memory On/Off for Point Cloud Voxelization
 
-**Expert Profile:** 15+ years NVIDIA/CUDA experience  
 **Date:** November 4, 2025  
 **GPU:** NVIDIA H100 PCIe (SM 9.0, 228 KB SMEM/SM)  
 **Addresses Audit:** "No ablation studies - need to quantify cache hit rate, occupancy impact"
@@ -543,7 +542,6 @@ __global__ void voxelize_occupancy_kernel(
 - ✅ Calculated cache hit rate based on point density
 - ✅ Evaluated SMEM constraints (228 KB limit, occupancy)
 - ✅ Theoretical performance modeling
-- ✅ Expert engineering judgment (15+ years)
 
 **Evidence quality:**
 - **Theory:** High confidence (scatter pattern, atomic constraints)

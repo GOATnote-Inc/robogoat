@@ -2,7 +2,6 @@
 
 **Expert Evaluation for RoboCache**
 
-**Author:** RoboCache Team (15+ years NVIDIA/CUDA experience)  
 **Date:** November 5, 2025  
 **Target:** NVIDIA H100 (SM 9.0 - 4th Gen Tensor Cores)  
 **Audience:** Principal Engineers, GPU Architects

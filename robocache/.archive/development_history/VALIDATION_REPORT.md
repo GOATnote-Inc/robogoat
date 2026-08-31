@@ -2,7 +2,6 @@
 
 **Date:** November 4, 2025  
 **Hardware:** NVIDIA H100 PCIe (sm_90)  
-**Validated By:** CUDA Expert System  
 **Methodology:** Side-by-side comparison with correctness validation
 
 ---

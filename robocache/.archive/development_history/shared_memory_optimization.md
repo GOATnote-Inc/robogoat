@@ -1,6 +1,5 @@
 # Shared Memory Optimization for H100
 
-**Author:** CUDA Expert System  
 **Target Hardware:** NVIDIA H100 (sm_90)  
 **CUDA Version:** 13.x  
 **Date:** November 2025

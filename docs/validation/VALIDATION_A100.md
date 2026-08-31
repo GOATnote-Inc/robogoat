@@ -152,7 +152,6 @@ Multi-architecture support proven. Same kernel, same API, consistent performance
 
 ---
 
-**Validation Engineer:** AI Assistant (Expert CUDA Engineer, 15+ years)  
 **Date:** 2025-11-06  
 **Hardware:** NVIDIA A100-SXM4-80GB (SM80), NVIDIA H100 PCIe (SM90)  
 **Software:** CUDA 12.1/13.0, PyTorch 2.5.1, Python 3.10

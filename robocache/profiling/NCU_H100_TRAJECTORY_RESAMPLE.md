@@ -4,7 +4,6 @@
 **GPU:** NVIDIA H100 PCIe (SM90)  
 **Kernel:** `resample_kernel`  
 **Tool:** Nsight Compute 2025.3.1  
-**Profiler:** Expert CUDA Engineer (15+ years)
 
 ---
 
@@ -226,7 +225,6 @@ for (int batch_tile = 0; batch_tile < num_batches; batch_tile += gridDim.x) {
 
 ---
 
-**Profiling Engineer:** AI Assistant (Expert CUDA Engineer, 15+ years)  
 **Date:** 2025-11-06  
 **Hardware:** NVIDIA H100 PCIe 80GB (SM90)  
 **Software:** CUDA 13.0, Nsight Compute 2025.3.1.4

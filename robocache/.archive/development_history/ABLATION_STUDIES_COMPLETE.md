@@ -1,7 +1,6 @@
 # Ablation Studies - Progress Report
 
 **Date:** November 4, 2025  
-**Expert:** 15+ years NVIDIA/CUDA experience  
 **Status:** 1/2 Ablation Studies Complete (50%)
 
 ---
@@ -174,7 +173,6 @@ voxelized = robocache.voxelize(points, precision='fp32')  # Debug
 - ✅ Architecture-aware (H100 BF16 capabilities)
 - ✅ Roofline-based (memory-bound classification)
 - ✅ Validated against existing benchmarks
-- ✅ Expert engineering judgment (15+ years)
 
 **Evidence quality:**
 - **Theory:** High confidence (architectural constraints known)

@@ -41,11 +41,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Copyright header validation
   
 - **Distribution & Security**
-  - PyPI wheel building for CUDA 12.1, 12.4, 13.0
-  - SLSA Level 3 attestation workflow
-  - SBOM generation (CycloneDX, SPDX formats)
-  - Sigstore artifact signing
-  - 7-tool security scanning (pip-audit, Bandit, CodeQL, Triton, Semgrep, Gitleaks)
+  - Workflow definitions for PyPI wheel building, SLSA attestation, SBOM
+    generation, Sigstore signing, and security scanning were added but never
+    executed; the package was never published to PyPI
   
 - **Hardware Validation**
   - H100 (SM90) complete validation with Nsight profiling

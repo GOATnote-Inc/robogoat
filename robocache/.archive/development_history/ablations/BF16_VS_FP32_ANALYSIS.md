@@ -1,6 +1,5 @@
 # Ablation Study: BF16 vs FP32 for Point Cloud Voxelization
 
-**Expert Profile:** 15+ years NVIDIA/CUDA experience  
 **Date:** November 4, 2025  
 **GPU:** NVIDIA H100 PCIe (SM 9.0)  
 **Addresses Audit:** "No ablation studies despite optimization claims"
@@ -360,7 +359,6 @@ benchmark_voxelization<__nv_bfloat16>();
 - ✅ Based on H100 architecture characteristics
 - ✅ Roofline analysis (memory-bound classification)
 - ✅ Validated against existing FP32 benchmarks
-- ✅ Expert engineering judgment (15+ years CUDA)
 
 **Why theoretical analysis is valid:**
 1. **Memory bandwidth is deterministic** - 50% savings for BF16 loads is guaranteed

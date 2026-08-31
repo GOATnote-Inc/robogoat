@@ -2,7 +2,7 @@
 
 **Date:** November 8, 2025  
 **Version:** 1.0.0  
-**Status:** ✅ **PRODUCTION-READY**
+**Status:** Historical status document (November 2025). See the archive notice in `README.md`; claims below have not been re-validated and several are stale (see notes inline).
 
 ---
 
@@ -51,13 +51,13 @@ This repository meets **NVIDIA expert standards** for GPU-accelerated libraries:
 - Kernel launch timeline validation
 - CPU/GPU synchronization verification
 
-**Location:** `artifacts/ncu_reports/*.ncu-rep` (binary reports)
+**Location:** `artifacts/h100/ncu_reports/` (text captures; binary `.ncu-rep` files were never committed)
 
 ---
 
 ### 4. GitHub Actions - Industry Standards
 
-**Current Status:** ✅ CI passing (last 5 runs successful)
+**Current Status (historical, stale):** CI at the time passed only because every step used `continue-on-error`; the GPU/security workflows listed below never ran and have since been removed. The self-hosted GPU runners no longer exist.
 
 **Workflow Architecture:**
 
@@ -161,7 +161,7 @@ docs/
 - ✅ Clean commit history
 - ✅ Proper `.gitignore` (no build artifacts)
 
-**Internal tracking:** All status files in `docs/internal/` (not in root)
+**Internal tracking:** Historical status files were removed in the 2026-08 cleanup.
 
 ---
 

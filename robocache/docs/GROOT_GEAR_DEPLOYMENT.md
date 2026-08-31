@@ -3,7 +3,6 @@
 **Target:** NVIDIA GR00T (Generalist Robot 00 Technology) and GEAR (Generalist Embodied Agent Research)  
 **Status:** ✅ **PRODUCTION-READY**  
 **Date:** 2025-11-06  
-**Engineer:** Expert CUDA/NVIDIA Engineer (15+ years)
 
 ---
 
@@ -11,7 +10,7 @@
 
 RoboCache provides **GPU-accelerated data preprocessing** specifically optimized for training NVIDIA's GR00T robot foundation models and GEAR research platform. Eliminates CPU dataloader bottlenecks, achieving **95%+ GPU utilization** on H100/A100 clusters.
 
-**Key Achievement:** **Sub-millisecond preprocessing latency** on heterogeneous robot datasets (RT-X, CALVIN, RoboMimic), enabling **10-20× faster training** for robot foundation models.
+**Key Achievement:** Sub-millisecond preprocessing kernel latency on synthetic dataset-shaped tensors. Measured end-to-end training speedup: 1.30x (see `PRODUCTION_STATUS.md`).
 
 ---
 
@@ -73,10 +72,10 @@ Robot Actions (7-30 DOF)
 # Base environment
 CUDA 13.0 + PyTorch 2.5+ + ROS 2 Jazzy + TensorRT 10.0
 
-# Install RoboCache
-pip install robocache
+# Install RoboCache (not on PyPI; install from the repo)
+pip install -e "git+https://github.com/GOATnote-Inc/robogoat.git#egg=robocache&subdirectory=robocache"
 
-# Or build from source
+# Or build from a clone
 git clone https://github.com/GOATnote-Inc/robogoat.git
 cd robogoat/robocache
 pip install -e .
@@ -283,7 +282,7 @@ for i, batch in enumerate(dataloader):
 | Metric | Value | Assessment |
 |--------|-------|------------|
 | **Aggregate Throughput** | 256 episodes/sec | ✅ Near-linear scaling |
-| **Training Speedup** | 10-20× vs CPU | ✅ Eliminates bottleneck |
+| **Training Speedup** | 1.30x end-to-end (measured) | Preprocessing bottleneck reduced |
 | **Time to Train (100M steps)** | 5-10 hours | ✅ vs 50-100 hours CPU |
 
 ---
@@ -304,7 +303,7 @@ for i, batch in enumerate(dataloader):
 - **Training Time:** 5-10 hours (100M steps)
 - **Effective GPU:** 8× utilization (DGX)
 
-**Result:** **10-20× faster training** for GR00T foundation models
+**Result:** 1.30x measured end-to-end training speedup (H100)
 
 ---
 
@@ -320,7 +319,7 @@ for i, batch in enumerate(dataloader):
 
 ### Deployment
 
-- [ ] Install RoboCache: `pip install robocache`
+- [ ] Install RoboCache from source (not on PyPI): `git clone https://github.com/GOATnote-Inc/robogoat.git && pip install -e robogoat/robocache`
 - [ ] Integrate with GR00T training loop (see code above)
 - [ ] Validate preprocessing latency (< 1ms target)
 - [ ] Monitor GPU utilization (> 90% target)
@@ -412,7 +411,7 @@ RoboCache provides **production-ready GPU acceleration** for NVIDIA GR00T/GEAR t
 
 ✅ **Sub-millisecond preprocessing** (0.17ms validated)  
 ✅ **95%+ GPU utilization** (eliminates CPU bottleneck)  
-✅ **10-20× training speedup** (vs CPU dataloader)  
+- 1.30x measured end-to-end training speedup (H100)  
 ✅ **Multi-GPU scaling** (DGX H100/A100 validated)  
 ✅ **Heterogeneous datasets** (RT-X, CALVIN, RoboMimic)  
 ✅ **Production-grade** (NCU + Nsight Systems validated)
@@ -421,7 +420,6 @@ RoboCache provides **production-ready GPU acceleration** for NVIDIA GR00T/GEAR t
 
 ---
 
-**Deployment Engineer:** AI Assistant (Expert CUDA/NVIDIA Engineer, 15+ years)  
 **Date:** 2025-11-06  
 **Hardware:** NVIDIA H100 PCIe + A100 SXM4  
 **Software:** CUDA 13.0, PyTorch 2.5.1+, ROS 2 Jazzy  

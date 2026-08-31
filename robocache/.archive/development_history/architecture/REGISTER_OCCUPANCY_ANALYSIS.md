@@ -1,6 +1,5 @@
-# Register & Occupancy Analysis - Expert CUDA Architecture Deep Dive
+# Register & Occupancy Analysis - Architecture Deep Dive
 
-**Expert Profile:** 15+ years NVIDIA/CUDA experience  
 **Date:** November 4, 2025  
 **GPU:** NVIDIA H100 PCIe (SM 9.0, Hopper Architecture)  
 **Addresses Audit:** "No register/occupancy analysis - need to document kernel resource usage"
@@ -670,7 +669,6 @@ voxelize_occupancy_kernel(...) {
 - ✅ CUDA Occupancy Calculator for theoretical limits
 - ✅ NCU profiling for measured occupancy
 - ✅ Comparison across GPU architectures
-- ✅ Expert analysis (15+ years CUDA)
 
 **Evidence Quality:**
 - **Measured:** cuobjdump, NCU (high confidence)

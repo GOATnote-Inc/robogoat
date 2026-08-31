@@ -54,9 +54,10 @@ export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 
 ### 2. Use Pre-Built Wheels (Production)
 
-For production deployment, use pre-built wheels from CI/CD pipeline that match CUDA versions:
+RoboCache was never published to PyPI; install from source:
 ```bash
-pip install robocache==1.0.0+cu121  # CUDA 12.1
+git clone https://github.com/GOATnote-Inc/robogoat.git
+pip install -e robogoat/robocache
 ```
 
 ### 3. Docker Container (Cleanest)
@@ -170,6 +171,5 @@ A100 validation is temporarily blocked due to environment configuration issues, 
 
 **Prepared By:** Brandon Dent <b@thegoatnote.com>  
 **Date:** 2025-11-07  
-**Expert Assessment:** 15+ years CUDA/NVIDIA engineering  
 **Recommendation:** Proceed with v1.0.0 release using H100 validation as primary evidence
 

@@ -184,7 +184,6 @@ Expert-level Nsight profiling infrastructure is **production-ready** and integra
 - ✅ Reproducible with documented commands
 - ✅ CI/CD ready for nightly benchmarks
 
-**All profiling requirements met and documented as expert CUDA engineer would.**
 
 ---
 

@@ -2,8 +2,6 @@
 
 This directory contains comprehensive GPU profiling data for RoboCache, validated using NVIDIA's professional profiling tools (NCU and Nsight Systems).
 
-**📋 [PROOF OF EXCELLENCE](PROOF_OF_EXCELLENCE.md)** ← Start here for complete validation matrix and verifiable evidence
-
 ## 📊 Validated Hardware
 
 | GPU | Architecture | CUDA | Status | Report |
@@ -15,7 +13,7 @@ This directory contains comprehensive GPU profiling data for RoboCache, validate
 
 ## 🔬 Profiling Methodology
 
-All profiling follows **expert standards** matching PyTorch, Triton, and FlashAttention-3:
+Profiling methodology modeled on PyTorch, Triton, and FlashAttention-3 practice:
 
 ### Tools Used
 - **NCU (Nsight Compute):** Kernel-level performance analysis with `--set full` metrics
@@ -40,12 +38,9 @@ artifacts/
 │   ├── H100_NCU_NSIGHT_REPORT.md            # Comprehensive expert report
 │   ├── gpu_info.txt                         # GPU specs and driver version
 │   ├── ncu_reports/
-│   │   ├── robocache_h100_full.ncu-rep      # Full NCU binary report (22MB)
 │   │   ├── metrics.csv                      # Extracted metrics (CSV)
 │   │   └── ncu_full_output.txt              # Console output
 │   └── nsys_reports/
-│       ├── robocache_h100_e2e.nsys-rep      # Nsight Systems timeline (4MB)
-│       ├── robocache_h100_e2e.sqlite        # SQLite database for analysis
 │       └── nsys_output.txt                  # Stats summary
 └── a100/                                     # A100 (SM80) profiling data
     ├── A100_VALIDATION_REPORT.md            # Comprehensive validation report
@@ -86,10 +81,9 @@ artifacts/
 
 **Note:** Binary profiling reports (`.ncu-rep`, `.nsys-rep`) are excluded from git (22MB+ total) per best practices for GPU repositories. 
 
-**To access binary reports:**
-1. **Regenerate locally:** Run profiling scripts on your GPU (see Reproducibility section)
-2. **Download from CI artifacts:** Available in GitHub Actions workflow runs
-3. **Contact maintainers:** For access to archived profiling sessions
+**To access binary reports:** regenerate locally by running the profiling
+scripts on your own GPU (see Reproducibility section). The binaries were never
+committed and no CI copies exist.
 
 ### NCU Reports (.ncu-rep)
 ```bash
@@ -150,7 +144,6 @@ All results are **100% reproducible** using the provided scripts:
 
 - ✅ **H100 (SM90):** Full NCU + Nsys profiling complete (78.62% occupancy, 51.82% memory BW)
 - ✅ **A100 (SM80):** Functional benchmarks + memory stability complete (σ < 6.4%, 0 MB leaks)
-- ✅ **Production Status:** Approved for deployment - [PROOF_OF_EXCELLENCE.md](PROOF_OF_EXCELLENCE.md)
 - 🔄 **L4 (SM89):** Pending (inference-optimized workload)
 
 ---

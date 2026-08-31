@@ -73,7 +73,7 @@ Trajectory Resampling:
 Multimodal Fusion:
 - CUDA: <1ms
 - PyTorch: ~5-10ms
-- Speedup: 10-20x ✓
+- Speedup: 3.8-110x kernel-level vs CPU (config-dependent); end-to-end training 1.30x
 
 Voxelization (128³):
 - CUDA: ~0.5-1.0ms

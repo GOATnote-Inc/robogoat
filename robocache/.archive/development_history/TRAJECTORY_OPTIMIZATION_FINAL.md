@@ -2,7 +2,6 @@
 
 **Date:** November 5, 2025  
 **GPU:** NVIDIA H100 PCIe (SM90)  
-**Engineer:** Expert CUDA/NVIDIA (15+ years)
 
 ---
 

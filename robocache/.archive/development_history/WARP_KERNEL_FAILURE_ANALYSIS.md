@@ -2,7 +2,6 @@
 
 **Date:** November 5, 2025  
 **GPU:** NVIDIA H100 PCIe (80GB, SM90)  
-**Analyst:** Expert CUDA/NVIDIA Engineer (15+ years)  
 **Status:** ❌ **REGRESSION IDENTIFIED - ROOT CAUSE DETERMINED**
 
 ---

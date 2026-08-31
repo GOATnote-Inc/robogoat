@@ -225,7 +225,6 @@ I certify that RoboCache is **production-ready** for NVIDIA H100 deployment in r
 ---
 
 **Expert Sign-Off:** b@thegoatnote.com  
-**Credentials:** Expert CUDA/NVIDIA Engineer (15+ years)  
 **Date:** November 5, 2025
 
 **This package represents professional-grade CUDA engineering work suitable for publication and production use.**

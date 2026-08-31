@@ -300,7 +300,7 @@ deployment on NVIDIA Hopper (SM90) architecture.
 
 ---
 
-**Validated By:** Brandon Dent, CUDA/NVIDIA Engineer (15+ years)  
+**Validated By:** Brandon Dent  
 **Date:** 2025-11-06  
 **Next Steps:** Tag v1.0.0, publish PyPI wheels, A100 validation
 
