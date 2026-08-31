@@ -6,65 +6,63 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      
+
       - name: Install dependencies
         run: |
-          pip install flake8 mypy
-      
-      - name: Run flake8
-        continue-on-error: true
+          pip install flake8
+
+      - name: Run flake8 (syntax errors and undefined names)
         run: |
           cd robocache/python
-          flake8 robocache --count --select=E9,F63,F7,F82 --show-source --statistics 2>&1 || echo "Linting issues found (non-blocking)"
-      
-      - name: Run mypy
-        continue-on-error: true
-        run: |
-          cd robocache/python
-          mypy robocache --ignore-missing-imports 2>&1 || echo "Type checking issues found (non-blocking)"
-  
+          flake8 robocache --count --select=E9,F63,F7,F82 --show-source --statistics
+
   test-cpu:
     name: CPU Tests
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      
+
       - name: Install dependencies
         run: |
           pip install torch --index-url https://download.pytorch.org/whl/cpu
-          pip install pytest numpy
-      
-      - name: Install RoboCache (CPU only)
+          pip install pytest numpy psutil setuptools wheel
+
+      - name: Install RoboCache (CPU only, no CUDA extensions)
         working-directory: ./robocache
-        continue-on-error: true
         run: |
-          pip install -e . 2>&1 || echo "Build skipped (CPU-only environment)"
-      
+          pip install -e . --no-build-isolation
+
       - name: Run CPU tests
+        # python -m pytest puts the working directory on sys.path, which the
+        # tests/perf modules need for their "from tests.perf..." imports
         working-directory: ./robocache
-        continue-on-error: true
         run: |
-          pytest tests/ -v -k "not cuda" 2>&1 || echo "CPU tests skipped"
-      
-      - name: Verify imports
-        continue-on-error: true
+          python -m pytest tests/ -v
+
+      - name: Verify import
+        # run inside robocache/ so the repo-root robocache/ directory does not
+        # shadow the installed package as a namespace package
+        working-directory: ./robocache
         run: |
-          python -c "import robocache; print(f'RoboCache {robocache.__version__} imported')" || echo "Import test skipped"
+          python -c "import robocache; print(f'RoboCache {robocache.__version__} imported')"

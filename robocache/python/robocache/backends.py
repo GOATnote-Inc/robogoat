@@ -219,6 +219,8 @@ class PyTorchBackend:
     def fused_multimodal_alignment(vision_data, vision_times, proprio_data, proprio_times,
                                    force_data, force_times, target_times):
         """PyTorch implementation of multimodal fusion."""
+        import torch
+
         # Resample each modality to target times
         vision_resampled = PyTorchBackend.resample_trajectories(
             vision_data, vision_times, target_times
