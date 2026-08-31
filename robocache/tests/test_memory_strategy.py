@@ -104,7 +104,7 @@ class TestChunking:
     def test_no_chunking_needed(self):
         """Test small batch that fits in memory"""
         points = torch.randn(2, 100, 3, device='cuda')
-        grid_size = torch.tensor([32, 32, 32], dtype=torch::int32, device='cuda')
+        grid_size = torch.tensor([32, 32, 32], dtype=torch.int32, device='cuda')
         origin = torch.zeros(3, device='cuda')
         
         result = robocache_cuda.voxelize_occupancy(
