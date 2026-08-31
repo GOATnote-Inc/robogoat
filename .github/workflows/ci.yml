@@ -54,9 +54,11 @@ jobs:
           pip install -e . --no-build-isolation
 
       - name: Run CPU tests
+        # python -m pytest puts the working directory on sys.path, which the
+        # tests/perf modules need for their "from tests.perf..." imports
         working-directory: ./robocache
         run: |
-          pytest tests/ -v
+          python -m pytest tests/ -v
 
       - name: Verify import
         # run inside robocache/ so the repo-root robocache/ directory does not
