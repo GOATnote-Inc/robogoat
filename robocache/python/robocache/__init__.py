@@ -480,7 +480,31 @@ def voxelize_occupancy(points, grid_size, voxel_size, origin, backend=None):
     )
 
 # Export public API
+def get_backend_info() -> dict:
+    """
+    Backend availability info for debugging/monitoring.
+
+    Returns:
+        Dict with per-backend availability and the default backend selection.
+    """
+    cuda_ok = bool(_cuda_available and torch.cuda.is_available())
+    return {
+        "backends": {
+            "cuda": {
+                "available": cuda_ok,
+                "performance_tier": "optimal" if cuda_ok else None,
+            },
+            "pytorch": {
+                "available": True,
+                "performance_tier": "fallback",
+            },
+        },
+        "default_backend": "cuda" if cuda_ok else "pytorch",
+    }
+
+
 __all__ = [
+    'get_backend_info',
     'resample_trajectories',
     'fuse_multimodal',
     'voxelize_pointcloud',

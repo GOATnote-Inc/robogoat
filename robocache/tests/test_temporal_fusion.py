@@ -115,7 +115,10 @@ class TestTemporalFusionBlock:
         x = torch.randn(2, 5, 256, requires_grad=True)
         
         output = block(x)
-        loss = output.sum()
+        # output.sum() after the final LayerNorm (gamma=1, beta=0 at init) is a
+        # constant, so its true gradient is exactly zero; use a quadratic loss
+        # to actually exercise gradient flow through the residuals.
+        loss = output.pow(2).sum()
         loss.backward()
         
         assert x.grad is not None
