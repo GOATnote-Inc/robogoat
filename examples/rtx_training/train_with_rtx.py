@@ -25,7 +25,7 @@ try:
     ROBOCACHE_AVAILABLE = True
 except ImportError:
     ROBOCACHE_AVAILABLE = False
-    print("⚠️  RoboCache not installed - install with: pip install robocache")
+    print("RoboCache not installed - install from source: git clone https://github.com/GOATnote-Inc/robogoat.git && pip install -e robogoat/robocache")
     exit(1)
 
 

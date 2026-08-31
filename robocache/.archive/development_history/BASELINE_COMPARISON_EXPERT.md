@@ -1,6 +1,5 @@
 # Baseline Comparison: Expert Analysis
 
-**Author:** GPU Performance Engineer (15+ years CUDA/NVIDIA experience)  
 **Date:** November 4, 2025  
 **Addresses Audit:** "No GPU-to-GPU baselines despite claims"
 

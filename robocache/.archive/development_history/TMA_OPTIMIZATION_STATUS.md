@@ -374,7 +374,6 @@ pipeline.consumer_wait();
 
 **Philosophy:**
 > "Optimization is never done, but shipping is. Ship when it's fast enough,
-> not when it's theoretically optimal." - Expert CUDA Engineer
 
 ---
 

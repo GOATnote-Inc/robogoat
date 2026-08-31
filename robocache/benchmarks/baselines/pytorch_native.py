@@ -2,7 +2,6 @@
 PyTorch Native Baseline for Trajectory Resampling
 ==================================================
 
-Expert CUDA Engineer Approach:
 - Fair comparison: Same batch size, precision, workload
 - Multiple implementations: lerp, grid_sample, searchsorted+lerp
 - Detailed profiling: CPU vs GPU, memory bandwidth, kernel fusion opportunities

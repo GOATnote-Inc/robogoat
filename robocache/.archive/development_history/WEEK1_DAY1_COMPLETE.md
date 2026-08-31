@@ -143,7 +143,6 @@ existing trajectory kernel. Fused kernel is optimization, not requirement.
 Honest assessment: 2/3 operations have CUDA support today.
 Goal: 3/3 by end of Week 1.
 
-Expert CUDA/NVIDIA engineer (15+ years)
 ```
 
 ---

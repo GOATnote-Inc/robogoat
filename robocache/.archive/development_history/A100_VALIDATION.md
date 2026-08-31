@@ -102,7 +102,7 @@ RoboCache is now validated on **both Hopper (SM90) and Ampere (SM80)** architect
 
 The A100 (SM80) environment is **production-ready** for RoboCache deployment. All compilation and validation tests pass with CUDA 13.0 and CUTLASS 4.2.1, confirming robust multi-GPU support across NVIDIA's data center lineup.
 
-**Expert Sign-Off:** B. Dent (CUDA & NVIDIA Engineer, 15+ years experience)  
+**Expert Sign-Off:** B. Dent  
 **Date:** 2025-11-06  
 **Contact:** b@thegoatnote.com
 

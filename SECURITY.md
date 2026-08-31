@@ -45,8 +45,8 @@ Please include the following information:
 
 ### Dependencies
 - **Minimal Surface:** Core dependencies limited to PyTorch and NumPy
-- **Pinned Versions:** All dependencies pinned in `pyproject.toml`
-- **Automated Updates:** Dependabot monitors for security updates
+- **Version Ranges:** Dependencies use `>=` ranges in `pyproject.toml` (not pinned)
+- **Updates:** No automated dependency monitoring is configured
 
 ## Vulnerability Disclosure Timeline
 
@@ -73,7 +73,8 @@ Please include the following information:
 ### For Developers
 ```bash
 # Always use latest security patches
-pip install --upgrade robocache
+# RoboCache is not published to PyPI; update from source:
+git -C robogoat pull && pip install -e ./robogoat/robocache
 
 # Run security scans locally
 pip-audit

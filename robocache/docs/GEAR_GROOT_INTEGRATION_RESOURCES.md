@@ -151,7 +151,7 @@ def preprocess_calvin_batch(batch):
     
     return {'voxels': depth_voxels, 'robot_state': robot_aligned}
 
-# Expected speedup: 10-20x over CPU Open3D voxelization
+# Speedup vs CPU varies by config; see bench/results CSV for measured numbers
 ```
 
 **Access:**
@@ -340,7 +340,7 @@ class CalvinVoxelDataLoader:
     High-performance CALVIN dataloader with GPU voxelization.
     
     Replaces CPU Open3D voxelization with RoboCache GPU kernel.
-    Expected speedup: 10-20x over baseline.
+    Speedup vs CPU baseline varies by config; see bench/results CSV.
     """
     
     def __init__(self, data_dir, batch_size=64):

@@ -43,7 +43,7 @@ except ImportError:
     ROBOCACHE_AVAILABLE = False
     DomainRandomizer = None
     LatencySimulator = None
-    print("⚠️  RoboCache not available - install with: pip install robocache")
+    print("RoboCache not available - install from source: git clone https://github.com/GOATnote-Inc/robogoat.git && pip install -e robogoat/robocache")
 
 # Isaac Sim imports (optional - fallback to mock if not available)
 try:
@@ -259,7 +259,7 @@ class Trainer:
         # Preprocessor
         if args.mode == 'robocache':
             if not ROBOCACHE_AVAILABLE:
-                raise RuntimeError("RoboCache not available - install with: pip install robocache")
+                raise RuntimeError("RoboCache not available - install from source: git clone https://github.com/GOATnote-Inc/robogoat.git && pip install -e robogoat/robocache")
             self.preprocessor = RoboCachePreprocessor().to(self.device)
             print(f"✓ Using RoboCache v{robocache.__version__}")
         else:
@@ -439,7 +439,7 @@ def main():
     # Validate
     if args.mode == 'robocache' and not ROBOCACHE_AVAILABLE:
         print("ERROR: RoboCache not installed")
-        print("Install with: pip install robocache")
+        print("Install from source: git clone https://github.com/GOATnote-Inc/robogoat.git && pip install -e robogoat/robocache")
         return 1
     
     if not torch.cuda.is_available():

@@ -150,7 +150,6 @@ ALL 3 OPERATIONS NOW HAVE CUDA SUPPORT:
 Status: 100% API coverage with CUDA acceleration.
 Week 1 goals on track.
 
-Expert CUDA/NVIDIA engineer (15+ years)
 ```
 
 ---

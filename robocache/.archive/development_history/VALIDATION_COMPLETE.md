@@ -1,7 +1,6 @@
 # RoboCache Validation: Expert Sign-Off
 
 **Date:** November 5, 2025  
-**Engineer:** Expert CUDA/NVIDIA (15+ years experience)  
 **Status:** ✅ **COMPLETE - PRODUCTION READY**
 
 ---
@@ -47,7 +46,6 @@ All RoboCache core kernels validated on NVIDIA H100 (SM90) with NCU profiling. P
 
 ### Why Standalone Kernels
 
-As an expert CUDA engineer, I validated kernels using **standalone CUDA programs** rather than full PyTorch integration because:
 
 1. **Isolation:** Removes PyTorch overhead, measures kernel performance directly
 2. **Precision:** NCU profiling of pure CUDA without JIT compilation noise
@@ -177,7 +175,7 @@ Full dataloader integration with RT-X/CALVIN/RoboMimic datasets not tested becau
 **RT-X (Open X-Embodiment):**
 - See `GEAR_GROOT_INTEGRATION_RESOURCES.md` for dataloaders
 - Focus on bridge_data, taco_play, rt1 datasets
-- Validate preprocessing speedup (target: 10-20x)
+- Validate preprocessing speedup (historical target; measured end-to-end training speedup was 1.30x)
 
 **CALVIN:**
 - High-frequency control (30 Hz)
@@ -244,7 +242,6 @@ I certify that all RoboCache core kernels have been validated to expert standard
 ---
 
 **Engineer:** b@thegoatnote.com  
-**Credentials:** Expert CUDA/NVIDIA Engineer (15+ years)  
 **Hardware:** NVIDIA H100 PCIe 80GB (awesome-gpu-name, Shadeform)  
 **Date:** November 5, 2025
 

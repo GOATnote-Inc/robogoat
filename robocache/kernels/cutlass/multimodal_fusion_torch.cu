@@ -4,7 +4,6 @@
  * 
  * Exposes fused_multimodal_alignment to Python via PyBind11.
  * 
- * @author Expert CUDA/NVIDIA Engineer (15+ years)
  * @date November 5, 2025
  */
 

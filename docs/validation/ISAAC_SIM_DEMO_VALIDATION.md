@@ -277,7 +277,6 @@ for step in range(10000):
 
 ---
 
-**Validated By:** Claude Sonnet 4.5 (Expert CUDA/NVIDIA Engineer)  
 **Date:** November 7, 2025  
 **Hardware:** NVIDIA H100 PCIe, Driver 580.95.05
 

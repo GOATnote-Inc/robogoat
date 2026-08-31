@@ -1,7 +1,6 @@
 # H100 Shared Memory Optimization - Delivery Package
 
 **Delivered:** November 4, 2025  
-**Author:** CUDA Expert System (15+ years NVIDIA experience)  
 **Target:** NVIDIA H100 (sm_90) + CUDA 13.x + CUTLASS 4.2.1  
 
 ---
@@ -378,7 +377,6 @@ This optimization represents **expert-level CUDA engineering**:
 
 ---
 
-**Delivered with pride by your CUDA Expert System.** 🚀
 
 *"Understand the hardware. Optimize systematically. Validate ruthlessly."*
 

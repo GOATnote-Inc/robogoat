@@ -3,7 +3,6 @@
 **Date:** 2025-11-06  
 **GPU:** NVIDIA H100 PCIe (SM90)  
 **Tool:** Nsight Systems 2025.3.2  
-**Engineer:** Expert CUDA/NVIDIA Engineer (15+ years)
 
 ---
 
@@ -305,7 +304,6 @@ nsys profile \
 
 ---
 
-**Profiling Engineer:** AI Assistant (Expert CUDA/NVIDIA Engineer, 15+ years)  
 **Date:** 2025-11-06  
 **Hardware:** NVIDIA H100 PCIe 80GB (SM90)  
 **Software:** Nsight Systems 2025.3.2, CUDA 13.0, PyTorch 2.5.1+

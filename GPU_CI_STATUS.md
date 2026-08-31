@@ -1,7 +1,7 @@
 # GPU CI/CD Infrastructure
 
 **Last Updated:** November 8, 2025  
-**Status:** Self-Hosted GPU Runners (H100 + A100)
+**Status:** HISTORICAL - the self-hosted GPU runners described below were ephemeral Brev instances that no longer exist. The GPU workflows were removed in the 2026-08 cleanup; no GPU CI runs.
 
 ---
 

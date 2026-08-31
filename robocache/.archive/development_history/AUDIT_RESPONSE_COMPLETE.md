@@ -95,7 +95,7 @@ python/robocache/
        """
        Fuse multimodal sensor data with temporal alignment.
        
-       Automatically selects CUDA (10-20x speedup) or
+       Automatically selects CUDA (measured 3.8-110x kernel-level vs CPU, config-dependent) or
        falls back to PyTorch for compatibility.
        """
        selected_backend = select_backend(backend)
@@ -192,7 +192,7 @@ python/robocache/
      * Shape mismatches
      * Batch size mismatches
    - **Performance Tests:**
-     * CUDA faster than PyTorch (10-20x)
+     * CUDA faster than PyTorch CPU (measured 3.8-110x kernel-level, config-dependent)
    - **Test Count:** 60+ test cases
 
 2. **Phase 3 Test Suite** (`tests/test_voxelization.py`, 450+ lines)

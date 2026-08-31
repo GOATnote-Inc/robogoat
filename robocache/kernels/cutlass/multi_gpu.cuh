@@ -2,7 +2,7 @@
  * RoboCache - Multi-GPU Safety and Stream Management
  * 
  * Production-grade multi-GPU programming utilities for safe and efficient
- * multi-device execution. Demonstrates expert CUDA stream semantics and
+ * multi-device execution. Demonstrates CUDA stream semantics and
  * device management.
  * 
  * Features:

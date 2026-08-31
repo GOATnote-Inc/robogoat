@@ -1,6 +1,7 @@
 # RoboCache
 
-<div align="center">
+> **Archived August 2026.** Last GPU validation 2025-11-08 on H100 PCIe at commit
+> `0db3726`; numbers below are from that run and have not been re-validated.
 
 **GPU-Accelerated Data Engine for Robot Foundation Models**
 
@@ -11,19 +12,20 @@
 
 [Quick Start](#quick-start) | [Installation](#installation) | [Performance](#performance) | [Documentation](robocache/README.md)
 
-</div>
-
 ---
 
 ## Overview
 
-RoboCache is a high-performance CUDA library for real-time sensor preprocessing in robotics. Eliminates CPU dataloader bottlenecks with **GPU-accelerated temporal alignment** and **point cloud voxelization**.
+RoboCache is a CUDA library for sensor preprocessing in robotics: GPU-accelerated
+temporal alignment (trajectory resampling, multimodal fusion) and point cloud
+voxelization, with a pure-PyTorch fallback.
 
-**Key Features:**
-- 🚀 **Sub-millisecond latency** - 0.021-0.035ms on H100 (measured)
-- ⚡ **GPU-accelerated with BF16** - CUDA kernels with vectorized loads
-- 🎯 **Production-ready** - A100/H100 validated, ROS 2 integration
-- 🔧 **Battle-tested** - 24h burn-in, Compute Sanitizer verified
+**Scope of validation:**
+- CUDA kernels were benchmarked on H100 PCIe and A100 SXM4 in November 2025.
+- All benchmark inputs were synthetic tensors (`torch.randn` / `torch.rand`),
+  including the "dataset" benchmarks, which use tensors shaped like Isaac Gym,
+  TartanAir, nuScenes, and KITTI samples - no real dataset files were loaded.
+- The CPU fallback has known correctness bugs (see [Known Issues](#known-issues)).
 
 ---
 
@@ -52,13 +54,12 @@ fused = robocache.fuse_multimodal(
     imu, imu_times,
     target_times
 )
-# Output: (4, 50, 588) - batch × time × (512+64+12)
-# H100: 0.034ms ± 0.002ms (n=100) | A100: 0.057ms (P50)
+# Output: (4, 50, 588) - batch x time x (512+64+12)
 ```
 
 **Point Cloud Voxelization:**
 ```python
-# LiDAR → 3D voxel grid
+# LiDAR -> 3D voxel grid
 points = torch.rand(500000, 3, device='cuda') * 20.0 - 10.0
 
 voxel_grid = robocache.voxelize_pointcloud(
@@ -68,14 +69,14 @@ voxel_grid = robocache.voxelize_pointcloud(
     grid_size=[128, 128, 128],
     mode='occupancy'
 )
-# H100: 24.3 billion points/sec (500K pts @ 0.0205ms, measured)
 ```
 
 ---
 
 ## Installation
 
-### From Source
+Not published to PyPI. Install from source:
+
 ```bash
 git clone https://github.com/GOATnote-Inc/robogoat.git
 cd robogoat/robocache
@@ -90,15 +91,8 @@ python setup.py develop
 python -c "import robocache; robocache.self_test()"
 ```
 
-### Docker
-```bash
-cd robocache
-docker build -t robocache:latest -f docker/Dockerfile.runtime .
-docker run --gpus all -it robocache:latest
-```
-
 **Requirements:**
-- NVIDIA GPU (Compute Capability ≥ 8.0)
+- NVIDIA GPU (Compute Capability >= 8.0)
 - CUDA 12.1+ or 13.0+
 - PyTorch 2.0+
 
@@ -106,151 +100,61 @@ docker run --gpus all -it robocache:latest
 
 ## Performance
 
-### H100 Benchmarks
+All numbers are from the November 2025 validation run on a single NVIDIA H100
+PCIe 80GB (CUDA 13.0, driver 580.95) and have not been re-validated since.
 
-**Validated November 2025 on NVIDIA H100 PCIe 80GB** (with P0 API - see [artifacts/h100_validation_final_results.md](artifacts/h100_validation_final_results.md))
+### Kernel microbenchmarks (H100, CUDA kernel vs. PyTorch on CPU)
 
-| Operation | Latency (Mean ± Std) | Throughput | Validation |
-|-----------|---------------------|------------|------------|
-| Trajectory Resample (32×500×256, bf16) | **0.0353 ± 0.0016 ms** | 28,300 ops/s | [H100 Results](artifacts/h100_validation_final_results.md) |
-| Voxelization (500K pts, 128³ grid) | **0.0205 ms** | 24.3 B pts/s | [H100 Results](artifacts/h100_validation_final_results.md) |
-| Multimodal Fusion (3 streams→50Hz) | **0.0339 ± 0.0022 ms** | 29,500 ops/s | [H100 Results](artifacts/h100_validation_final_results.md) |
+Source: [`robocache/bench/results/benchmark_h100_20251106_172811.csv`](robocache/bench/results/benchmark_h100_20251106_172811.csv)
+(5 seeds x 50 repeats = 250 measurements per CUDA config; synthetic bf16 tensors).
 
-**Statistical Rigor:** 5 seeds × 50 repeats = 250 measurements per config  
-**Hardware:** NVIDIA H100 PCIe 81GB, CUDA 13.0, Driver 580.95  
-**Methodology:** `torch.cuda.Event` timing with warmup, CSV export  
-**Full Report:** [Benchmark Summary](robocache/bench/results/BENCHMARK_H100_SUMMARY.md)
+| Trajectory resample config (B x S -> T, D) | CUDA P50 | PyTorch CPU P50 | Speedup |
+|---|---|---|---|
+| 8 x 250, 128 (small) | 0.184 ms | 20.14 ms | ~110x |
+| 32 x 500, 256 (medium) | 2.605 ms | 38.39 ms | ~15x |
+| 64 x 1000, 512 (large) | 20.05 ms | 75.69 ms | ~3.8x |
 
-### A100 Benchmarks
+These are kernel-vs-CPU microbenchmarks, not end-to-end training comparisons.
 
-| Operation | Latency (P50) | Hardware |
-|-----------|---------------|----------|
-| Multimodal Fusion (3-stream) | **0.057 ms** | A100 SXM4 80GB |
-| Voxelization (occupancy, 500K pts) | **0.032 ms** | A100 SXM4 80GB |
+### End-to-end training (H100, measured)
 
-**Report:** [A100 Validation](docs/validation/A100_VALIDATION_COMPLETE.md)
+Source: [`PRODUCTION_STATUS.md`](PRODUCTION_STATUS.md) and
+[`robocache/profiling/NCU_H100_TRAJECTORY_RESAMPLE.md`](robocache/profiling/NCU_H100_TRAJECTORY_RESAMPLE.md).
 
-### Architecture
+| Pipeline | ms/step | Speedup |
+|---|---|---|
+| Baseline (PyTorch preprocessing) | 18.28 | 1.00x |
+| RoboCache preprocessing | 14.04 | **1.30x** |
 
-```
-RoboCache Pipeline:
-┌─────────────────────────────────────────────────────────┐
-│  Sensor Data (GPU)                                       │
-│    ├─ Vision Stream     (30 Hz, 512D)                   │
-│    ├─ Proprioception    (100 Hz, 64D)                   │
-│    └─ IMU               (200 Hz, 12D)                   │
-└─────────────────────────────────────────────────────────┘
-                          │
-                          ▼
-┌─────────────────────────────────────────────────────────┐
-│  RoboCache CUDA Kernels                                  │
-│    ├─ Binary Search + Linear Interpolation             │
-│    ├─ Coalesced Memory Access                          │
-│    └─ BF16 Vectorization                               │
-└─────────────────────────────────────────────────────────┘
-                          │
-                          ▼
-┌─────────────────────────────────────────────────────────┐
-│  Aligned Features (50 Hz, 588D)                         │
-│    → Policy Network → Training                          │
-└─────────────────────────────────────────────────────────┘
-```
+The measured end-to-end training speedup is **1.30x**, driven by preprocessing
+being a minority of step time once the model forward/backward is included.
 
-**Key Optimizations:**
-- Binary search for timestamp alignment (log N complexity)
-- Vectorized BF16 loads (4-element vectors, 4× bandwidth vs scalar)
-- L1-resident workloads (99%+ cache hit rate for fusion/resample)
-- Zero CPU/GPU transfers (end-to-end GPU pipeline)
+### Known regression (measured, documented)
 
----
+Source: [`robocache/benchmarks/results/h100_validated_20251105.json`](robocache/benchmarks/results/h100_validated_20251105.json).
 
-## Expert Validation (NCU & Nsight)
+| Config (B x S -> T, D) | RoboCache | PyTorch GPU | Result |
+|---|---|---|---|
+| 64 x 4096 -> 1024, 32 | 0.190 ms | 0.140 ms | **0.74x (slower)** |
 
-**All performance claims verified with NVIDIA profiling tools:**
+For long sequences (> ~2000 timesteps) the per-thread binary search falls out
+of L1 cache and native PyTorch GPU interpolation is faster. See
+[`KNOWN_LIMITATIONS.md`](KNOWN_LIMITATIONS.md).
 
-### Nsight Compute (NCU) - H100 SM90 Kernel Metrics
+### Profiling artifacts
 
-| Kernel | DRAM BW | SM Throughput | Warps Active | L1 Hit Rate | Report |
-|--------|---------|---------------|--------------|-------------|--------|
-| **Trajectory Resample** | 0.05% | 1.27% | 12.48% | 99%+ | [NCU H100](robocache/profiling/NCU_H100_TRAJECTORY_RESAMPLE.md) |
-| **Multimodal Fusion** | 0.03% | 2.15% | 12.49% | 99%+ | [NCU Complete](robocache/profiling/NCU_COMPLETE_ANALYSIS.md) |
-| **Voxelization** | 54.17% | 14.06% | 64.83% | N/A | [NCU Complete](robocache/profiling/NCU_COMPLETE_ANALYSIS.md) |
-
-**GPU:** NVIDIA H100 PCIe (SM90) | **Tool:** Nsight Compute 2025.3.1.4  
-**NCU Binary Reports:** `robocache/.archive/development_history/perf/ncu_reports/*.ncu-rep`
-
-### A100 SM80 Performance Validation
-
-**Full performance benchmarking on A100-SXM4-80GB:**
-
-| Operation | H100 Latency | A100 Latency | Scaling | Report |
-|-----------|--------------|--------------|---------|--------|
-| Multimodal Fusion | 0.034 ms (Mean) | 0.057 ms (P50) | 0.60x | [H100 Results](artifacts/h100_validation_final_results.md) |
-| Voxelization (500K pts) | 0.021 ms (Mean) | 0.032 ms (P50) | 0.66x | [H100 Results](artifacts/h100_validation_final_results.md) |
-| Trajectory Resample | 0.035 ms (Mean) | ~0.05 ms (est.) | ~0.70x | [H100 Results](artifacts/h100_validation_final_results.md) |
-
-**Throughput:** 15-16 billion points/sec (count/occupancy), 5-7 B pts/s (mean/max)  
-**Status:** ✅ Production-validated on both H100 (SM90) and A100 (SM80)
-
-### Nsight Systems - End-to-End Timeline
-
-**H100 Full Pipeline Profiling:**
-- **End-to-end latency:** 1.56ms/step (12.84× faster than 20ms target)
-- **RoboCache preprocessing:** 19.3% of GPU time (83.4μs per call)
-- **Throughput:** 20,548 episodes/sec
-- **Memory overhead:** 0.15% (negligible)
-
-**Report:** [Nsight Systems H100](robocache/profiling/NSIGHT_SYSTEMS_H100.md)
-
-### Expert Assessment
-
-**Memory Hierarchy Analysis:**
-- **Trajectory/Fusion:** L1-resident (99%+ cache hit rate) → Optimal for binary search
-- **Voxelization:** 54% DRAM utilization → Excellent for atomic scatter workload
-- **Roofline Position:** Each kernel optimized for its workload pattern
-
-**Production Validation:**
-- ✅ All latency targets exceeded
-- ✅ H100 + A100 cross-validation complete
-- ✅ NCU metrics confirm architecture-appropriate optimization
-- ✅ Nsight Systems confirms zero CPU bottleneck
-
-**Summary:** [Expert Profiling Report](robocache/artifacts/refs/H100_PROFILING_SUMMARY.md)
+Nsight Compute and Nsight Systems text captures from the H100/A100 runs are
+committed under [`artifacts/h100/`](artifacts/h100/) and
+[`artifacts/a100/`](artifacts/a100/) (with GPU and driver stamps). Binary
+`.ncu-rep` / `.nsys-rep` files are not committed.
 
 ---
 
 ## Examples
 
-### ROS 2 Integration
-```bash
-cd examples/ros2_node
-ros2 run robocache_ros robot_preprocessor.py
-```
-[Full Tutorial](examples/ros2_node/README.md)
-
-### Isaac Sim Demo
-```bash
-cd examples/isaac_sim_demo
-python train_robot_policy.py --mode robocache
-```
-[Demo Guide](examples/isaac_sim_demo/README.md)
-
-### Multi-GPU Training
-```bash
-cd examples/multi_gpu
-python benchmark_multi_gpu.py --gpus 4
-```
-[Scaling Guide](examples/multi_gpu/README.md)
-
----
-
-## Documentation
-
-- [API Reference](docs/sphinx/index.rst)
-- [Installation Guide](docs/sphinx/installation.rst)
-- [Quick Start Tutorial](docs/sphinx/quickstart.rst)
-- [Performance Tuning](docs/KERNEL_TUNING_GUIDE.md)
-- [Validation Reports](docs/validation/)
+- ROS 2 node: [`examples/ros2_node/`](examples/ros2_node/)
+- Isaac Sim demo (synthetic fallback data): [`examples/isaac_sim_demo/`](examples/isaac_sim_demo/)
+- Multi-GPU benchmark: [`examples/multi_gpu/`](examples/multi_gpu/)
 
 ---
 
@@ -258,21 +162,41 @@ python benchmark_multi_gpu.py --gpus 4
 
 ```bash
 cd robocache
-
-# Unit tests
-pytest tests/test_*_correctness.py -v
-
-# Performance tests
-python benchmarks/smoke.py
-
-# Stress tests
-pytest tests/stress/ -v
+pytest tests/ -v
 ```
 
-**CI Status:**
-- ✅ Lint + CPU tests (every PR)
-- ✅ Security scan (weekly)
-- ✅ Compute Sanitizer (weekly memcheck/racecheck)
+**CI:** Lint + CPU tests on every PR (`.github/workflows/ci.yml`). CUDA kernels
+are not exercised in CI; GPU validation was manual (see
+[`docs/validation/`](docs/validation/)). The self-hosted GPU runners used for
+that validation no longer exist.
+
+---
+
+## Known Issues
+
+- **CPU voxelization fallback is incorrect.** `ops_fallback.voxelize_pointcloud_cpu`
+  clamps out-of-bounds points into boundary voxels instead of dropping them
+  (diverging from the CUDA kernel), and raises `IndexError` on empty or
+  single-point clouds. The corresponding CPU tests are marked `xfail`. Do not
+  use the CPU fallback where voxel occupancy correctness matters.
+- **Stale multimodal-fusion tests.** `robocache/tests/test_multimodal_fusion.py`
+  targets a pre-1.0 two-stream `fuse_multimodal` API and is skipped; the current
+  API takes three streams.
+- **Compute Sanitizer / 24h burn-in were never run in CI.** The stress-test code
+  exists but there is no committed memcheck/racecheck log.
+- **Voxelization out-of-bounds behavior (CUDA):** points outside the grid are
+  clipped, no error is thrown.
+- **Timestamp monotonicity is not enforced;** callers must supply monotonically
+  increasing timestamps.
+
+---
+
+## Documentation
+
+- [API Reference](docs/sphinx/index.rst)
+- [Performance Tuning](docs/KERNEL_TUNING_GUIDE.md)
+- [Known Limitations](KNOWN_LIMITATIONS.md)
+- [Validation notes](docs/validation/)
 
 ---
 
@@ -281,46 +205,11 @@ pytest tests/stress/ -v
 ```bibtex
 @software{robocache2025,
   title={RoboCache: GPU-Accelerated Data Engine for Robot Learning},
-  author={GOATnote Engineering},
+  author={Dent, Brandon},
   year={2025},
-  url={https://github.com/GOATnote-Inc/robogoat},
-  note={H100/A100 validated, Nsight profiled}
+  url={https://github.com/GOATnote-Inc/robogoat}
 }
 ```
-
----
-
-## Known Limitations
-
-### Performance Considerations
-- **Trajectory Resampling:** Optimal for batch sizes 8-64. Single-sample latency may be dominated by kernel launch overhead (~5μs).
-- **Voxelization:** Throughput scales with point count. For <10K points, CPU implementation may be competitive due to launch overhead.
-- **Multimodal Fusion:** Currently uses 3 sequential kernel launches. Kernel fusion could reduce latency by ~40% (future optimization).
-
-### Hardware Compatibility
-- **Minimum:** CUDA Compute Capability 8.0 (A100, A10G, RTX 3090)
-- **Tested:** H100 PCIe (SM90), A100 SXM4 (SM80)  
-- **Not tested:** V100 (SM70), consumer GPUs (RTX 4090)
-- **BFloat16:** Requires SM80+ (A100/H100). Falls back to FP32 on older hardware.
-
-### API Stability
-- **Public API:** `resample_trajectories()`, `voxelize_pointcloud()`, `fuse_multimodal()` - stable
-- **Experimental:** Streaming kernels, CUTLASS-based implementations - subject to change
-- **Backward compatibility:** See `artifacts/kernel_inventory.md` for production vs research status
-
-### Functional Limitations
-- **Timestamp monotonicity:** Not enforced. User must ensure monotonically increasing timestamps.
-- **Out-of-bounds:** Voxelization clips points outside grid bounds (no error thrown).
-- **Empty inputs:** Zero-length tensors may cause undefined behavior (add validation in production code).
-
-### Documentation
-- **Performance claims:** All claims based on H100/A100 measurements. See `artifacts/h100_validation_final_results.md` for exact configs.
-- **Benchmark reproducibility:** Requires same hardware, driver version, and CUDA toolkit. Variations up to ±10% are normal.
-
-**For detailed analysis and optimization guidance, see:**
-- [H100 Validation Report](artifacts/h100_validation_final_results.md)
-- [Performance Claims Evidence Matrix](artifacts/performance_claims_evidence_matrix.md)
-- [Kernel Inventory](artifacts/kernel_inventory.md)
 
 ---
 
@@ -330,14 +219,5 @@ Apache 2.0 - See [LICENSE](LICENSE)
 
 ---
 
-## Acknowledgments
-
-- **NVIDIA** - H100/A100 GPU access, Nsight profiling tools
-- **PyTorch** - Deep learning framework
-- **Robot Learning Community** - Feedback and validation
-- **Performance Validation** - NVIDIA Nsight Compute & Nsight Systems profiling
-
----
-
-**Maintained by:** [GOATnote Engineering](mailto:b@thegoatnote.com)  
-**Status:** Production-Ready (v1.0.0)
+**Maintained by:** [GOATnote](mailto:b@thegoatnote.com)
+**Status:** Archived (August 2026)

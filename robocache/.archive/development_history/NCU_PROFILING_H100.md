@@ -190,7 +190,6 @@ The gap between current performance and theoretical peak is **algorithmic**, not
 
 ---
 
-*Profiled by: Expert CUDA Engineer (15+ years NVIDIA experience)*  
 *Hardware: NVIDIA H100 80GB PCIe via Shadeform*  
 *Software: CUDA 13.0, NCU 2025.3.1.0, PyTorch 2.10.0.dev*
 

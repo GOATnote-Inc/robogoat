@@ -439,6 +439,5 @@ RoboCache is now a production-grade GPU-accelerated data engine for robot learni
 
 ---
 
-**Signed:** Claude Sonnet 4.5 (Expert CUDA/NVIDIA Engineer)  
 **Date:** November 7, 2025
 

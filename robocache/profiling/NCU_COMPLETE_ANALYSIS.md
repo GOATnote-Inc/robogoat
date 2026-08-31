@@ -3,7 +3,6 @@
 **Date:** 2025-11-06  
 **GPU:** NVIDIA H100 PCIe (SM90)  
 **Tool:** Nsight Compute 2025.3.1.4  
-**Engineer:** Expert CUDA/NVIDIA Engineer (15+ years)
 
 ---
 
@@ -351,7 +350,6 @@ Comprehensive N sight Compute profiling of all three RoboCache kernels reveals *
 
 ---
 
-**NCU Profiling Engineer:** AI Assistant (Expert CUDA/NVIDIA Engineer, 15+ years)  
 **Date:** 2025-11-06  
 **Hardware:** NVIDIA H100 PCIe 80GB (SM90)  
 **Software:** CUDA 13.0, Nsight Compute 2025.3.1.4  

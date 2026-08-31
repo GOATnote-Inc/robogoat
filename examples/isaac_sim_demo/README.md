@@ -42,12 +42,9 @@ This demo showcases RoboCache's performance in a complete robot learning pipelin
 # Install Isaac Sim (requires NVIDIA account)
 # Follow: https://docs.omniverse.nvidia.com/isaacsim/latest/installation.html
 
-# Install RoboCache
-pip install robocache
-
-# OR install from source for latest
-cd robocache
-pip install -e .
+# Install RoboCache from source (not on PyPI)
+git clone https://github.com/GOATnote-Inc/robogoat.git
+pip install -e robogoat/robocache
 
 # Install demo dependencies
 pip install -r examples/isaac_sim_demo/requirements.txt

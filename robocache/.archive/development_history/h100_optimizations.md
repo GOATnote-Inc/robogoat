@@ -147,7 +147,7 @@ float weight = s_weight;
 - H100 has 228KB shared memory per SM (vs 164KB on A100)
 - Shared memory latency: ~20 cycles
 - Global memory latency: ~200-400 cycles
-- **10-20x faster** for frequently accessed data
+- Faster for frequently accessed data (final measured range: 3.8-110x kernel-level vs CPU, config-dependent)
 
 **Shared Memory Layout**:
 ```

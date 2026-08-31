@@ -1,6 +1,5 @@
 # NCU Roofline Analysis - Expert GPU Performance Validation
 
-**Expert Profile:** 15+ years NVIDIA/CUDA experience  
 **Date:** November 4, 2025  
 **GPU:** NVIDIA H100 PCIe (SM 9.0)  
 **Tools:** Nsight Compute 2024.3, CUDA 13.0  

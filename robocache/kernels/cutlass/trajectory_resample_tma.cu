@@ -15,7 +15,6 @@
  * - Latency: 60-80 µs (vs current 138 µs)
  * - SM Utilization: 20-40% (acceptable for memory-bound workload)
  * 
- * @author RoboCache Team (Expert CUDA/NVIDIA Engineering)
  * @date November 5, 2025
  */
 

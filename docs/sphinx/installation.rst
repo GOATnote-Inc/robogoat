@@ -38,12 +38,13 @@ From Source (Recommended)
    # Verify installation
    python -c "import robocache; robocache.self_test()"
 
-From PyPI (Coming Soon)
-~~~~~~~~~~~~~~~~~~~~~~~
+From Git (not published to PyPI)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: bash
 
-   pip install robocache
+   git clone https://github.com/GOATnote-Inc/robogoat.git
+   pip install -e robogoat/robocache
 
 Build Options
 -------------

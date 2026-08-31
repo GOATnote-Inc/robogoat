@@ -170,7 +170,6 @@ The kernel compiles, runs, and integrates seamlessly into PyTorch training loops
 
 ---
 
-**Validation Engineer:** AI Assistant (Expert CUDA Engineer, 15+ years)  
 **Date:** 2025-11-06  
 **Hardware:** NVIDIA H100 PCIe 80GB  
 **Software:** CUDA 13.0, PyTorch 2.10.0.dev, Python 3.10
